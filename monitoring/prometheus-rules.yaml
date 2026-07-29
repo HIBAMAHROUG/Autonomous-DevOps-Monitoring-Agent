@@ -1,0 +1,38 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: infrastructure-alerts
+  namespace: monitoring
+  labels:
+    release: monitoring
+    app.kubernetes.io/instance: monitoring
+spec:
+  groups:
+    - name: infrastructure.rules
+      rules:
+        - alert: HighCPUUsage
+          expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High CPU Usage"
+            description: "CPU usage is above 90% for smore than 2 minutes."
+
+        - alert: HighMemoryUsage
+          expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High Memory Usage"
+            description: "Memory usage is above 85%."
+
+        - alert: HighDiskUsage
+          expr: ((node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_avail_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"}) * 100 > 90
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            summary: "High Disk Usage"
+            description: "Disk usage is above 90%."

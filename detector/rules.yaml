@@ -1,0 +1,6 @@
+cpu:
+  threshold: 90
+  duration: 300
+
+memory:
+  threshold: 85
