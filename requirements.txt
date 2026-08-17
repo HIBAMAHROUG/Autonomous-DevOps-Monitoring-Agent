@@ -1,6 +1,6 @@
 ﻿mysql-connector-python==8.0.33
 pyyaml==6.0.2
-pydantic==2.0.3
+pydantic==2.10.6
 fastapi==0.100.0
 uvicorn==0.23.0
 python-dotenv==1.0.0
