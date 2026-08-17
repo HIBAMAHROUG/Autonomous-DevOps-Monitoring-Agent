@@ -9,3 +9,4 @@ influxdb-client>=1.40
 pytest
 requests>=2.31
 numpy
+pandas
