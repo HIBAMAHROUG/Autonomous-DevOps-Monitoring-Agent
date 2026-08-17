@@ -7,3 +7,4 @@ python-dotenv==1.0.0
 psycopg2-binary>=2.9
 influxdb-client>=1.40
 pytest
+requests>=2.31
