@@ -12,3 +12,4 @@ numpy
 pandas
 joblib
 scikit-learn
+schedule
