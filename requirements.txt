@@ -11,3 +11,4 @@ requests>=2.31
 numpy
 pandas
 joblib
+scikit-learn
