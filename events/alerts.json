@@ -2,7 +2,7 @@
     {
         "service": "monitoring-agent",
         "metric": "CPU",
-        "value": 91.92426956173745,
+        "value": 95,
         "severity": "CRITICAL"
     }
 ]

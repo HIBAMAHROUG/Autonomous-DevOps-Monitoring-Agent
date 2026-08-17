@@ -7,6 +7,11 @@ from collector.metrics import (
     get_network,
     get_disk
 )
+from collector.processing import aggregate_metrics, normalize_metrics
+from storage import MetricsStore
+
+
+STORE = MetricsStore()
 
 
 def collect_metrics():
@@ -25,15 +30,34 @@ def collect_metrics():
         "disk_usage": disk
     }
 
+    normalized_metrics = normalize_metrics(metrics)
+    recent_metrics = STORE.list_metrics(limit=60)
+    aggregate = aggregate_metrics([item.get("raw", {}) for item in recent_metrics] + [metrics])
+
     logger.info("Collected metrics:")
     logger.info(metrics)
+    logger.info("Normalized metrics:")
+    logger.info(normalized_metrics)
+    logger.info("Aggregate metrics:")
+    logger.info(aggregate)
+
+    STORE.write_metrics(
+        raw_metrics=metrics,
+        normalized_metrics=normalized_metrics,
+        aggregate=aggregate
+    )
 
     alerts = check_metrics(metrics)
 
     if alerts:
         logger.warning(f"Critical alert detected: {alerts}")
 
-    print(metrics)
+    return {
+        "raw": metrics,
+        "normalized": normalized_metrics,
+        "aggregate": aggregate,
+        "alerts": alerts,
+    }
 
 
 if __name__ == "__main__":

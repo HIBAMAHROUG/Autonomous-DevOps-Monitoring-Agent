@@ -1,0 +1,41 @@
+[
+  {
+    "problem_id": "PB-0042",
+    "title": "High memory usage on EC2 worker nodes",
+    "category": "resource_exhaustion",
+    "metric": "memory_utilization",
+    "condition": "> 90%",
+    "affected_component": "worker-node",
+    "duration_s": 120,
+    "known_causes": ["memory leak in agent process", "unbounded cache growth", "traffic spike"],
+    "corrective_actions": ["ACT-RESTART-SVC", "ACT-SCALE-OUT", "ACT-CLEAR-CACHE"],
+    "severity_default": "high",
+    "tags": ["memory", "ec2", "worker"]
+  },
+  {
+    "problem_id": "PB-0057",
+    "title": "CPU saturation on API gateway",
+    "category": "resource_exhaustion",
+    "metric": "cpu_utilization",
+    "condition": "> 85%",
+    "affected_component": "api-gateway",
+    "duration_s": 90,
+    "known_causes": ["sudden traffic spike", "inefficient query pattern"],
+    "corrective_actions": ["ACT-SCALE-OUT"],
+    "severity_default": "medium",
+    "tags": ["cpu", "api-gateway"]
+  },
+  {
+    "problem_id": "PB-0063",
+    "title": "Database connection pool exhaustion",
+    "category": "resource_exhaustion",
+    "metric": "db_connections_used",
+    "condition": "> 95%",
+    "affected_component": "database",
+    "duration_s": 60,
+    "known_causes": ["connection leak", "long-running transactions"],
+    "corrective_actions": ["ACT-RESTART-DB-CONN-POOL"],
+    "severity_default": "critical",
+    "tags": ["database", "connections"]
+  }
+]

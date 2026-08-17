@@ -2,6 +2,23 @@ version: "3.8"
 
 services:
 
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: admin12345
+      DOCKER_INFLUXDB_INIT_ORG: monitoring
+      DOCKER_INFLUXDB_INIT_BUCKET: ai-agent
+      DOCKER_INFLUXDB_INIT_RETENTION: 720h0m0s
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: monitoring-token
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    restart: always
+
   prometheus:
     image: prom/prometheus
     container_name: prometheus
@@ -18,3 +35,22 @@ services:
     ports:
       - "9100:9100"
     restart: always
+
+  api:
+    build: .
+    container_name: monitoring-api
+    command: python -m app
+    ports:
+      - "5000:5000"
+    environment:
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_ORG: monitoring
+      INFLUX_BUCKET: ai-agent
+      INFLUX_TOKEN: monitoring-token
+      METRICS_RETENTION_DAYS: "30"
+    depends_on:
+      - influxdb
+    restart: always
+
+volumes:
+  influxdb-data:

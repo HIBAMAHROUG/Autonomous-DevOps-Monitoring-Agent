@@ -1,0 +1,56 @@
+[
+  {
+    "action_id": "ACT-RESTART-SVC",
+    "name": "Restart service",
+    "type": "remediation",
+    "executor": "ssm_run_command",
+    "params_schema": {
+      "service_name": "string",
+      "instance_id": "string"
+    },
+    "risk_level": "medium",
+    "reversible": true,
+    "avg_resolution_time_s": 45,
+    "success_rate_historical": 0.87
+  },
+  {
+    "action_id": "ACT-SCALE-OUT",
+    "name": "Scale out worker group",
+    "type": "remediation",
+    "executor": "terraform_apply",
+    "params_schema": {
+      "asg_name": "string",
+      "increment": "int"
+    },
+    "risk_level": "low",
+    "reversible": true,
+    "avg_resolution_time_s": 120,
+    "success_rate_historical": 0.91
+  },
+  {
+    "action_id": "ACT-CLEAR-CACHE",
+    "name": "Clear application cache",
+    "type": "remediation",
+    "executor": "ssm_run_command",
+    "params_schema": {
+      "instance_id": "string",
+      "cache_path": "string"
+    },
+    "risk_level": "low",
+    "reversible": true,
+    "avg_resolution_time_s": 0.78
+  },
+  {
+    "action_id": "ACT-RESTART-DB-CONN-POOL",
+    "name": "Restart database connection pool",
+    "type": "remediation",
+    "executor": "ssm_run_command",
+    "params_schema": {
+      "service_name": "string"
+    },
+    "risk_level": "high",
+    "reversible": false,
+    "avg_resolution_time_s": 60,
+    "success_rate_historical": 0.65
+  }
+]

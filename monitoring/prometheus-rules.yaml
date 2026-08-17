@@ -17,7 +17,7 @@ spec:
             severity: critical
           annotations:
             summary: "High CPU Usage"
-            description: "CPU usage is above 90% for smore than 2 minutes."
+            description: "CPU usage is above 90% for more than 2 minutes."
 
         - alert: HighMemoryUsage
           expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
@@ -27,6 +27,19 @@ spec:
           annotations:
             summary: "High Memory Usage"
             description: "Memory usage is above 85%."
+
+        - alert: HighNetworkTraffic
+          expr: |
+            sum by(instance) (
+              rate(node_network_receive_bytes_total{device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+              + rate(node_network_transmit_bytes_total{device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+            ) > 10485760
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "High network traffic"
+            description: "Network throughput is above 10 MiB/s on {{ $labels.instance }}."
 
         - alert: HighDiskUsage
           expr: ((node_filesystem_size_bytes{fstype!="tmpfs"} - node_filesystem_avail_bytes{fstype!="tmpfs"}) / node_filesystem_size_bytes{fstype!="tmpfs"}) * 100 > 90
