@@ -29,3 +29,5 @@ Thumbs.db
 
 # Generated artifacts
 artifacts/
+*.bak
+*.backup
