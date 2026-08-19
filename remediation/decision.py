@@ -1,14 +1,16 @@
 """
-Logique de décision finale : à partir des candidates scorées, décide si
-l'agent auto-exécute, suggère à un humain, ou escalade.
+Logique de décision finale.
 
-Les seuils sont chargés depuis config (voir config/remediation_thresholds.yaml)
-et NE DOIVENT PAS être codés en dur ailleurs dans le projet.
+Les seuils sont chargés depuis :
+config/remediation_thresholds.yaml
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from pathlib import Path
+
+import yaml
 
 from remediation.models import (
     AnomalyEvent,
@@ -25,12 +27,48 @@ class SeverityThresholds:
     suggest: float
 
 
-DEFAULT_THRESHOLDS: dict[Severity, SeverityThresholds] = {
-    Severity.CRITICAL: SeverityThresholds(auto_execute=0.90, suggest=0.60),
-    Severity.HIGH: SeverityThresholds(auto_execute=0.85, suggest=0.50),
-    Severity.MEDIUM: SeverityThresholds(auto_execute=0.80, suggest=0.40),
-    Severity.LOW: SeverityThresholds(auto_execute=0.75, suggest=0.30),
-}
+CONFIG_PATH = (
+    Path(__file__).resolve().parent.parent
+    / "config"
+    / "remediation_thresholds.yaml"
+)
+
+
+def load_thresholds(
+    config_path: Path = CONFIG_PATH,
+) -> dict[Severity, SeverityThresholds]:
+    """Charge les seuils depuis le fichier YAML."""
+
+    if not config_path.exists():
+        raise FileNotFoundError(
+            f"Remediation thresholds configuration not found: {config_path}"
+        )
+
+    with config_path.open("r", encoding="utf-8") as file:
+        data = yaml.safe_load(file) or {}
+
+    raw_thresholds = data.get("thresholds", {})
+
+    thresholds: dict[Severity, SeverityThresholds] = {}
+
+    for severity in Severity:
+        key = severity.value.lower()
+        values = raw_thresholds.get(key)
+
+        if values is None:
+            raise ValueError(
+                f"Missing remediation thresholds for severity: {key}"
+            )
+
+        thresholds[severity] = SeverityThresholds(
+            auto_execute=float(values["auto_execute"]),
+            suggest=float(values["suggest"]),
+        )
+
+    return thresholds
+
+
+DEFAULT_THRESHOLDS = load_thresholds()
 
 
 def decide(
@@ -40,13 +78,20 @@ def decide(
     shadow_mode: bool = False,
 ) -> Decision:
     """
-    shadow_mode=True force le mode SUGGEST_TO_HUMAN même si la confiance
-    dépasserait le seuil d'auto-exécution. À utiliser pendant la période
-    probatoire avant d'activer l'auto-exécution en prod (voir design doc,
-    étape "shadow mode").
+    Décide si l'agent :
+
+    - auto-exécute ;
+    - suggère une action humaine ;
+    - escalade.
+
+    shadow_mode=True force le mode SUGGEST_TO_HUMAN.
     """
+
     candidate_actions_payload = [
-        {"action_id": sc.candidate.action.action_id, "confidence": sc.confidence}
+        {
+            "action_id": sc.candidate.action.action_id,
+            "confidence": sc.confidence,
+        }
         for sc in scored_candidates
     ]
 
@@ -72,6 +117,7 @@ def decide(
     ):
         mode = DecisionMode.AUTO_EXECUTE
         reason = "confidence_above_auto_execute_threshold"
+
     elif best.confidence >= t.suggest:
         mode = DecisionMode.SUGGEST_TO_HUMAN
         reason = (
@@ -79,6 +125,7 @@ def decide(
             if shadow_mode and best.confidence >= t.auto_execute
             else "confidence_above_suggest_threshold_below_auto_execute"
         )
+
     else:
         mode = DecisionMode.ESCALATE
         reason = "confidence_below_suggest_threshold"
@@ -88,7 +135,11 @@ def decide(
         anomaly_id=anomaly.anomaly_id,
         matched_problem_id=best.candidate.source_problem.problem_id,
         candidate_actions=candidate_actions_payload,
-        chosen_action_id=best.candidate.action.action_id if mode != DecisionMode.ESCALATE else None,
+        chosen_action_id=(
+            best.candidate.action.action_id
+            if mode != DecisionMode.ESCALATE
+            else None
+        ),
         decision_mode=mode,
         confidence=best.confidence,
         reason=reason,

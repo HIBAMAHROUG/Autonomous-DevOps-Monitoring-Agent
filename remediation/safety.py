@@ -8,6 +8,11 @@ from typing import Any
 @dataclass
 class SafetyConfig:
     max_actions_per_hour: int = 10
+
+    # Anti-boucle par pod
+    max_pod_actions: int = 3
+    pod_action_window_minutes: int = 15
+
     max_replicas: int = 5
     max_blast_radius: int = 3
     critical_requires_approval: bool = True
@@ -17,6 +22,10 @@ class SafetyConfig:
 @dataclass
 class SafetyState:
     action_times: list[datetime] = field(default_factory=list)
+
+    # Historique des actions par pod
+    pod_action_times: dict[str, list[datetime]] = field(default_factory=dict)
+
     consecutive_failures: int = 0
     circuit_open: bool = False
     kill_switch: bool = False
@@ -47,8 +56,11 @@ class SafetyPolicy:
         if self.state.circuit_open:
             return False, "Circuit breaker is open"
 
-        # Max actions/hour
+        # ---------------------------------------------------------
+        # Global max actions/hour
+        # ---------------------------------------------------------
         one_hour_ago = now - timedelta(hours=1)
+
         self.state.action_times = [
             t for t in self.state.action_times
             if t > one_hour_ago
@@ -57,7 +69,40 @@ class SafetyPolicy:
         if len(self.state.action_times) >= self.config.max_actions_per_hour:
             return False, "Maximum actions per hour exceeded"
 
+        # ---------------------------------------------------------
+        # Anti-loop protection per pod
+        # ---------------------------------------------------------
+        pod_id = params.get("pod_id")
+
+        if pod_id:
+            pod_id = str(pod_id)
+
+            window_start = now - timedelta(
+                minutes=self.config.pod_action_window_minutes
+            )
+
+            pod_times = self.state.pod_action_times.get(pod_id, [])
+
+            # Garder uniquement les actions dans la fenêtre
+            pod_times = [
+                t for t in pod_times
+                if t > window_start
+            ]
+
+            self.state.pod_action_times[pod_id] = pod_times
+
+            if len(pod_times) >= self.config.max_pod_actions:
+                return (
+                    False,
+                    f"Pod action limit exceeded for {pod_id}: "
+                    f"{self.config.max_pod_actions} actions in "
+                    f"{self.config.pod_action_window_minutes} minutes; "
+                    "automatic remediation stopped and escalation required",
+                )
+
+        # ---------------------------------------------------------
         # Blast radius
+        # ---------------------------------------------------------
         replicas = params.get("replicas")
 
         if replicas is not None:
@@ -69,7 +114,9 @@ class SafetyPolicy:
             if replicas > self.config.max_replicas:
                 return False, "Blast radius limit exceeded"
 
+        # ---------------------------------------------------------
         # Critical actions require approval
+        # ---------------------------------------------------------
         if (
             severity.upper() == "CRITICAL"
             and self.config.critical_requires_approval
@@ -77,7 +124,13 @@ class SafetyPolicy:
         ):
             return False, "Human approval required for critical action"
 
+        # ---------------------------------------------------------
+        # Record action
+        # ---------------------------------------------------------
         self.state.action_times.append(now)
+
+        if pod_id:
+            self.state.pod_action_times.setdefault(pod_id, []).append(now)
 
         return True, "Safety checks passed"
 
