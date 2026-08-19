@@ -1,0 +1,16 @@
+thresholds:
+  critical:
+    auto_execute: 0.90
+    suggest: 0.60
+
+  high:
+    auto_execute: 0.85
+    suggest: 0.50
+
+  medium:
+    auto_execute: 0.80
+    suggest: 0.40
+
+  low:
+    auto_execute: 0.75
+    suggest: 0.30
