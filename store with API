@@ -1,0 +1,224 @@
+[1mdiff --git a/alloy/alloy-values.yaml b/alloy/alloy-values.yaml[m
+[1mnew file mode 100644[m
+[1mindex 0000000..3e09db5[m
+[1m--- /dev/null[m
+[1m+++ b/alloy/alloy-values.yaml[m
+[36m@@ -0,0 +1,45 @@[m
+[32m+[m[32mcontroller:[m
+[32m+[m[32m  type: daemonset[m
+[32m+[m
+[32m+[m[32malloy:[m
+[32m+[m[32m  configMap:[m
+[32m+[m[32m    create: true[m
+[32m+[m[32m    content: |[m
+[32m+[m[32m      discovery.kubernetes "pods" {[m
+[32m+[m[32m        role = "pod"[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      discovery.relabel "pod_logs" {[m
+[32m+[m[32m        targets = discovery.kubernetes.pods.targets[m
+[32m+[m
+[32m+[m[32m        rule {[m
+[32m+[m[32m          source_labels = ["__meta_kubernetes_namespace"][m
+[32m+[m[32m          target_label  = "namespace"[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        rule {[m
+[32m+[m[32m          source_labels = ["__meta_kubernetes_pod_name"][m
+[32m+[m[32m          target_label  = "pod"[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        rule {[m
+[32m+[m[32m          source_labels = ["__meta_kubernetes_pod_container_name"][m
+[32m+[m[32m          target_label  = "container"[m
+[32m+[m[32m        }[m
+[32m+[m
+[32m+[m[32m        rule {[m
+[32m+[m[32m          source_labels = ["__meta_kubernetes_pod_node_name"][m
+[32m+[m[32m          target_label = "node"[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      loki.source.kubernetes "pods" {[m
+[32m+[m[32m        targets    = discovery.relabel.pod_logs.output[m
+[32m+[m[32m        forward_to = [loki.write.default.receiver][m
+[32m+[m[32m      }[m
+[32m+[m
+[32m+[m[32m      loki.write "default" {[m
+[32m+[m[32m        endpoint {[m
+[32m+[m[32m          url = "http://loki.monitoring.svc.cluster.local:3100/loki/api/v1/push"[m
+[32m+[m[32m        }[m
+[32m+[m[32m      }[m
+[1mdiff --git a/diagonisis/log_collector.py b/diagonisis/log_collector.py[m
+[1mindex 03229a0..2585d63 100644[m
+[1m--- a/diagonisis/log_collector.py[m
+[1m+++ b/diagonisis/log_collector.py[m
+[36m@@ -1,11 +1,11 @@[m
+[31m-import os[m
+[32m+[m[32m﻿import os[m
+ import time[m
+ import requests[m
+ [m
+ [m
+ LOKI_URL = os.getenv("LOKI_URL", "http://localhost:3100")[m
+[31m-MAX_LINES = 500[m
+[31m-MAX_DURATION = 5[m
+[32m+[m[32mMAX_LINES = 100[m
+[32m+[m[32mMAX_DURATION = 10[m
+ [m
+ [m
+ class LogCollectionError(Exception):[m
+[36m@@ -21,13 +21,14 @@[m [mdef get_pod_logs(pod, namespace="default"):[m
+         "query": f'{{namespace="{namespace}",pod="{pod}"}}',[m
+         "limit": MAX_LINES,[m
+         "direction": "backward",[m
+[32m+[m[32m        "since": "5m",[m
+     }[m
+ [m
+     try:[m
+         response = requests.get([m
+             url,[m
+             params=params,[m
+[31m-            timeout=MAX_DURATION,[m
+[32m+[m[32m            timeout=(2, MAX_DURATION),[m
+         )[m
+ [m
+         response.raise_for_status()[m
+[36m@@ -40,15 +41,18 @@[m [mdef get_pod_logs(pod, namespace="default"):[m
+             for entry in stream.get("values", []):[m
+                 timestamp, message = entry[m
+ [m
+[31m-                logs.append({[m
+[31m-                    "timestamp": timestamp,[m
+[31m-                    "message": message[m
+[31m-                })[m
+[32m+[m[32m                logs.append([m
+[32m+[m[32m                    {[m
+[32m+[m[32m                        "timestamp": timestamp,[m
+[32m+[m[32m                        "message": message,[m
+[32m+[m[32m                    }[m
+[32m+[m[32m                )[m
+ [m
+         logs = logs[:MAX_LINES][m
+ [m
+         filtered_logs = [[m
+[31m-            log for log in logs[m
+[32m+[m[32m            log[m
+[32m+[m[32m            for log in logs[m
+             if any([m
+                 level in log["message"].upper()[m
+                 for level in ["WARN", "ERROR", "FATAL"][m
+[36m@@ -67,7 +71,7 @@[m [mdef get_pod_logs(pod, namespace="default"):[m
+             "namespace": namespace,[m
+             "logs": filtered_logs,[m
+             "count": len(filtered_logs),[m
+[31m-            "duration_seconds": round(elapsed, 3)[m
+[32m+[m[32m            "duration_seconds": round(elapsed, 3),[m
+         }[m
+ [m
+     except requests.RequestException as exc:[m
+[1mdiff --git a/events/alerts.json b/events/alerts.json[m
+[1mindex 70e3aed..b961a3d 100644[m
+[1m--- a/events/alerts.json[m
+[1m+++ b/events/alerts.json[m
+[36m@@ -2,7 +2,7 @@[m
+     {[m
+         "service": "monitoring-agent",[m
+         "metric": "CPU",[m
+[31m-        "value": 95.0,[m
+[32m+[m[32m        "value": 95,[m
+         "severity": "CRITICAL"[m
+     }[m
+ ][m
+\ No newline at end of file[m
+[1mdiff --git a/requirements.txt b/requirements.txt[m
+[1mindex 9ebb0d8..ac2f86b 100644[m
+[1m--- a/requirements.txt[m
+[1m+++ b/requirements.txt[m
+[36m@@ -1,4 +1,4 @@[m
+[31m-﻿mysql-connector-python==8.0.33[m
+[32m+[m[32mmysql-connector-python==8.0.33[m
+ pyyaml==6.0.2[m
+ pydantic==2.10.6[m
+ fastapi==0.100.0[m
+[36m@@ -13,5 +13,4 @@[m [mpandas[m
+ joblib[m
+ scikit-learn[m
+ schedule[m
+[31m-schedule[m
+[31m-schedule[m
+[32m+[m[32mflask==3.1.3[m
+[1mdiff --git a/storage/metrics_store.py b/storage/metrics_store.py[m
+[1mindex 061f58c..80f860b 100644[m
+[1m--- a/storage/metrics_store.py[m
+[1m+++ b/storage/metrics_store.py[m
+[36m@@ -2,7 +2,7 @@[m
+ [m
+ import json[m
+ import os[m
+[31m-from datetime import datetime, timezone[m
+[32m+[m[32mfrom datetime import datetime, timedelta, timezone[m
+ from typing import Any[m
+ [m
+ from .influx import _get_client[m
+[36m@@ -13,6 +13,12 @@[m [mclass MetricsStore:[m
+         self.measurement = "monitoring_agent_metrics"[m
+         self.bucket = os.getenv("INFLUX_BUCKET", "metrics")[m
+         self.org = os.getenv("INFLUX_ORG", "sre-org")[m
+[32m+[m[32m        self.retention_days = int(os.getenv("METRICS_RETENTION_DAYS", "30"))[m
+[32m+[m
+[32m+[m[32m        # InfluxDB est considéré comme configuré si une URL est disponible.[m
+[32m+[m[32m        self.influx_enabled = bool([m
+[32m+[m[32m            os.getenv("INFLUX_URL", "http://localhost:8086")[m
+[32m+[m[32m        )[m
+ [m
+     def write_metrics([m
+         self,[m
+[36m@@ -43,13 +49,44 @@[m [mclass MetricsStore:[m
+         finally:[m
+             write_api.close()[m
+ [m
+[31m-    def list_metrics(self, limit: int = 60) -> list[dict[str, Any]]:[m
+[32m+[m[32m    def get_history([m
+[32m+[m[32m        self,[m
+[32m+[m[32m        window: str = "24h",[m
+[32m+[m[32m        limit: int = 100,[m
+[32m+[m[32m    ) -> list[dict[str, Any]]:[m
+[32m+[m[32m        """[m
+[32m+[m[32m        Retourne l'historique des métriques depuis InfluxDB.[m
+[32m+[m
+[32m+[m[32m        Exemples de window :[m
+[32m+[m[32m        - 1h[m
+[32m+[m[32m        - 6h[m
+[32m+[m[32m        - 24h[m
+[32m+[m[32m        - 7d[m
+[32m+[m[32m        - 30d[m
+[32m+[m[32m        """[m
+[32m+[m
+[32m+[m[32m        window = window.strip().lower()[m
+[32m+[m
+[32m+[m[32m        if window.endswith("h"):[m
+[32m+[m[32m            hours = float(window[:-1])[m
+[32m+[m[32m            start = f"-{hours}h"[m
+[32m+[m[32m        elif window.endswith("d"):[m
+[32m+[m[32m            days = float(window[:-1])[m
+[32m+[m[32m            start = f"-{days}d"[m
+[32m+[m[32m        elif window.endswith("m"):[m
+[32m+[m[32m            minutes = float(window[:-1])[m
+[32m+[m[32m            start = f"-{minutes}m"[m
+[32m+[m[32m        else:[m
+[32m+[m[32m            start = "-24h"[m
+[32m+[m
+[32m+[m[32m        limit = max(1, min(int(limit), 10000))[m
+[32m+[m
+         client = _get_client()[m
+         query_api = client.query_api()[m
+ [m
+         flux = f'''[m
+         from(bucket: "{self.bucket}")[m
+[31m-          |> range(start: -30d)[m
+[32m+[m[32m          |> range(start: {start})[m
+           |> filter(fn: (r) => r._measurement == "{self.measurement}")[m
+           |> pivot([m
+               rowKey: ["_time"],[m
+[36m@@ -7

@@ -1,11 +1,11 @@
-import os
+﻿import os
 import time
 import requests
 
 
 LOKI_URL = os.getenv("LOKI_URL", "http://localhost:3100")
-MAX_LINES = 500
-MAX_DURATION = 5
+MAX_LINES = 100
+MAX_DURATION = 10
 
 
 class LogCollectionError(Exception):
@@ -21,13 +21,14 @@ def get_pod_logs(pod, namespace="default"):
         "query": f'{{namespace="{namespace}",pod="{pod}"}}',
         "limit": MAX_LINES,
         "direction": "backward",
+        "since": "5m",
     }
 
     try:
         response = requests.get(
             url,
             params=params,
-            timeout=MAX_DURATION,
+            timeout=(2, MAX_DURATION),
         )
 
         response.raise_for_status()
@@ -40,15 +41,18 @@ def get_pod_logs(pod, namespace="default"):
             for entry in stream.get("values", []):
                 timestamp, message = entry
 
-                logs.append({
-                    "timestamp": timestamp,
-                    "message": message
-                })
+                logs.append(
+                    {
+                        "timestamp": timestamp,
+                        "message": message,
+                    }
+                )
 
         logs = logs[:MAX_LINES]
 
         filtered_logs = [
-            log for log in logs
+            log
+            for log in logs
             if any(
                 level in log["message"].upper()
                 for level in ["WARN", "ERROR", "FATAL"]
@@ -67,7 +71,7 @@ def get_pod_logs(pod, namespace="default"):
             "namespace": namespace,
             "logs": filtered_logs,
             "count": len(filtered_logs),
-            "duration_seconds": round(elapsed, 3)
+            "duration_seconds": round(elapsed, 3),
         }
 
     except requests.RequestException as exc:
