@@ -1,4 +1,4 @@
-﻿import os
+import os
 import json
 import datetime
 from pathlib import Path
@@ -29,7 +29,7 @@ class MetricsStore:
         self.token = os.getenv("INFLUX_TOKEN")
         self.org = os.getenv("INFLUX_ORG", "sre-org")
         self.bucket = os.getenv("INFLUX_BUCKET", "metrics")
-        self.retention_days = 30
+        self.retention_days = 30  # Ajouté pour la compatibilité avec routes.py
         self.data_dir = Path(data_dir)
         self.data_dir.mkdir(exist_ok=True)
         self.jsonl_file = self.data_dir / "metrics.jsonl"
@@ -227,7 +227,7 @@ class MetricsStore:
             "storage": "jsonl" if not self.influx_enabled else "influxdb",
             "bucket": self.bucket,
             "org": self.org,
-            "retention_days": self.retention_days,
+            "retention_days": self.retention_days,  # Ajouté pour routes.py
         }
 
         if self.influx_enabled:
