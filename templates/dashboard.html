@@ -1,0 +1,213 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<title>Agent DevOps Autonome — Tableau de bord</title>
+<style>
+  body { font-family: -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 2rem; }
+  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
+  .subtitle { color: #9aa0a6; margin-bottom: 2rem; }
+  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
+  .card { background: #1a1d24; border-radius: 10px; padding: 1rem 1.5rem; min-width: 140px; border: 1px solid #2a2e37; }
+  .card .value { font-size: 1.8rem; font-weight: 700; }
+  .card .label { color: #9aa0a6; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
+  .resolved .value { color: #4ade80; }
+  .escalated .value { color: #fbbf24; }
+  .failed .value { color: #f87171; }
+  .pending .value { color: #60a5fa; }
+  section { margin-bottom: 2.5rem; }
+  h2 { font-size: 1.1rem; border-bottom: 1px solid #2a2e37; padding-bottom: 0.5rem; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
+  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #22252c; }
+  th { color: #9aa0a6; font-weight: 500; }
+  .status { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
+  .status-resolved { background: #14331f; color: #4ade80; }
+  .status-escalated { background: #332a12; color: #fbbf24; }
+  .status-failed { background: #331616; color: #f87171; }
+  button { cursor: pointer; border: none; border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.8rem; margin-right: 0.4rem; }
+  .approve { background: #14331f; color: #4ade80; }
+  .reject { background: #331616; color: #f87171; }
+  #apiKeyBanner { background: #1a1d24; border: 1px solid #2a2e37; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.85rem; }
+  #apiKeyBanner input { background: #0f1115; border: 1px solid #2a2e37; color: #e6e6e6; padding: 0.3rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; }
+  .empty { color: #6b7280; font-style: italic; padding: 1rem 0; }
+</style>
+</head>
+
+<body>
+
+<h1>Agent DevOps Autonome</h1>
+<p class="subtitle">Tableau de bord de supervision</p>
+
+<div id="apiKeyBanner">
+  Clé API :
+  <input type="password" id="apiKeyInput" placeholder="X-API-Key">
+  <button onclick="setApiKey()">Charger</button>
+</div>
+
+<section id="summarySection" style="display:none">
+  <div class="cards">
+    <div class="card">
+      <div class="value" id="countDetected">–</div>
+      <div class="label">Incidents détectés</div>
+    </div>
+
+    <div class="card resolved">
+      <div class="value" id="countResolved">–</div>
+      <div class="label">Résolus automatiquement</div>
+    </div>
+
+    <div class="card escalated">
+      <div class="value" id="countEscalated">–</div>
+      <div class="label">Escaladés</div>
+    </div>
+
+    <div class="card pending">
+      <div class="value" id="countPending">–</div>
+      <div class="label">En attente d'approbation</div>
+    </div>
+
+    <div class="card failed">
+      <div class="value" id="countFailed">–</div>
+      <div class="label">Échecs</div>
+    </div>
+  </div>
+</section>
+
+<section id="approvalsSection" style="display:none">
+  <h2>Approbations en attente</h2>
+  <div id="approvalsList"></div>
+</section>
+
+<section id="historySection" style="display:none">
+  <h2>Historique des interventions</h2>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Horodatage</th>
+        <th>Action</th>
+        <th>Statut</th>
+        <th>Message</th>
+      </tr>
+    </thead>
+
+    <tbody id="historyBody"></tbody>
+  </table>
+</section>
+
+<script>
+let apiKey = null;
+
+function setApiKey() {
+  apiKey = document.getElementById('apiKeyInput').value;
+
+  if (!apiKey) return;
+
+  document.getElementById('summarySection').style.display = 'block';
+  document.getElementById('approvalsSection').style.display = 'block';
+  document.getElementById('historySection').style.display = 'block';
+
+  refresh();
+
+  setInterval(refresh, 15000);
+}
+
+async function apiGet(path) {
+  const res = await fetch(path, {
+    headers: {
+      'X-API-Key': apiKey
+    }
+  });
+
+  if (!res.ok) {
+    throw new Error('API error ' + res.status);
+  }
+
+  return res.json();
+}
+
+async function apiPost(path) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: {
+      'X-API-Key': apiKey
+    }
+  });
+
+  return res.json();
+}
+
+async function refresh() {
+  try {
+    const summary = await apiGet('/api/dashboard/summary');
+
+    document.getElementById('countDetected').textContent = summary.detected;
+    document.getElementById('countResolved').textContent = summary.resolved;
+    document.getElementById('countEscalated').textContent = summary.escalated;
+    document.getElementById('countPending').textContent = summary.pending_approval;
+    document.getElementById('countFailed').textContent = summary.failed;
+
+    const pending = await apiGet('/api/approvals/pending');
+    const list = document.getElementById('approvalsList');
+
+    if (pending.approvals.length === 0) {
+      list.innerHTML =
+        '<p class="empty">Aucune action en attente d\'approbation.</p>';
+    } else {
+      list.innerHTML = pending.approvals.map(a => `
+        <div class="card" style="margin-bottom:0.75rem;">
+          <strong>${a.action_id}</strong>
+          — ${a.executor} (${a.severity})<br>
+
+          <span style="color:#9aa0a6">${a.reason}</span><br><br>
+
+          <button
+            class="approve"
+            onclick="decide('${a.action_id}', 'approve')">
+            Approuver
+          </button>
+
+          <button
+            class="reject"
+            onclick="decide('${a.action_id}', 'reject')">
+            Rejeter
+          </button>
+        </div>
+      `).join('');
+    }
+
+    const history =
+      await apiGet('/api/dashboard/history?limit=50');
+
+    const body = document.getElementById('historyBody');
+
+    body.innerHTML = history.history.map(h => `
+      <tr>
+        <td>${new Date(h.timestamp).toLocaleString('fr-FR')}</td>
+        <td>${h.action_id}</td>
+        <td>
+          <span class="status status-${h.status}">
+            ${h.status}
+          </span>
+        </td>
+        <td>${h.message}</td>
+      </tr>
+    `).join('') ||
+      '<tr><td colspan="4" class="empty">Aucune intervention journalisée.</td></tr>';
+
+  } catch (e) {
+    console.error(e);
+  }
+}
+
+async function decide(actionId, decision) {
+  await apiPost(
+    `/api/approvals/${actionId}/${decision}`
+  );
+
+  refresh();
+}
+</script>
+
+</body>
+</html>
