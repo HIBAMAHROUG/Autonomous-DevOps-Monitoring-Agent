@@ -1,5 +1,5 @@
 ﻿import time
-from datetime import datetime
+from datetime import datetime, timezone
 
 from detector.detector import check_metrics
 from logger import logger
@@ -50,17 +50,19 @@ def collect_metrics():
     normalized_metrics = normalize_metrics(metrics)
     print("Normalized: OK", flush=True)
 
-    recent_metrics = STORE.list_metrics(limit=60)
+    recent_metrics = STORE.get_history(window="24h", limit=60)
 
     aggregate = aggregate_metrics(
         [item.get("raw", {}) for item in recent_metrics] + [metrics]
     )
 
-    STORE.write_metrics(
-        raw_metrics=metrics,
-        normalized_metrics=normalized_metrics,
-        aggregate=aggregate,
-    )
+    STORE.write_metric({
+        "timestamp": datetime.now(),
+        "cpu_usage": cpu,
+        "memory_usage": memory,
+        "network_usage": network,
+        "disk_usage": disk,
+    })
 
     print("Storage: OK", flush=True)
 
@@ -106,3 +108,6 @@ if __name__ == "__main__":
 
         print("Next collection in 30s...", flush=True)
         time.sleep(30)
+
+
+
