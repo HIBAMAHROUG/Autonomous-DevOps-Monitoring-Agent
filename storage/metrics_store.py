@@ -1,6 +1,6 @@
 ﻿import os
 import json
-import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import List, Dict, Optional, Any
 
@@ -103,112 +103,174 @@ class MetricsStore:
             print(f"⚠️  Erreur de lecture JSONL: {e}")
             return []
 
-    def write_metric(self, data: Dict[str, Any]):
-        """
-        Écrit une métrique dans InfluxDB et en fallback JSONL.
-        Le dictionnaire doit contenir au minimum 'timestamp' et les champs de métriques.
-        """
-        timestamp = data.get("timestamp")
-        if not timestamp:
-            timestamp = datetime.datetime.utcnow().isoformat() + "Z"
-            data["timestamp"] = timestamp
+    def write_metric(
+        self,
+        metric: dict[str, Any]
+    ) -> None:
+        """Write one metric to InfluxDB, with JSONL fallback."""
 
-        self._write_to_jsonl(data)
-
-        client = self._get_influx_client()
-        if not client:
+        if not metric:
             return
 
-        try:
-            fields = {k: v for k, v in data.items() if k != "timestamp"}
+        # Make a safe copy so we never modify the caller's dictionary.
+        data = dict(metric)
 
-            if isinstance(timestamp, (int, float)):
-                time_ns = int(timestamp * 1_000_000_000)
-            else:
+        timestamp = data.pop("timestamp", None)
+
+        if timestamp is None:
+            timestamp = datetime.now(timezone.utc)
+        elif isinstance(timestamp, str):
+            try:
+                timestamp = datetime.fromisoformat(
+                    timestamp.replace("Z", "+00:00")
+                )
+            except ValueError:
+                timestamp = datetime.now(timezone.utc)
+
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+
+        # Try InfluxDB first.
+        if self.influx_enabled and self._influx_client is not None:
+            try:
+                from influxdb_client import Point, WritePrecision
+
+                point = Point("system_metrics")
+
+                for key, value in data.items():
+
+                    if value is None:
+                        continue
+
+                    if isinstance(value, bool):
+                        point = point.field(key, value)
+
+                    elif isinstance(value, (int, float)):
+                        point = point.field(key, float(value))
+
+                    elif isinstance(value, str):
+                        point = point.field(key, value)
+
+                point = point.time(
+                    timestamp,
+                    WritePrecision.S
+                )
+
+                write_api = self._influx_client.write_api(write_options=SYNCHRONOUS)
+
                 try:
-                    dt = datetime.datetime.fromisoformat(timestamp.replace("Z", "+00:00"))
-                    time_ns = int(dt.timestamp() * 1_000_000_000)
-                except:
-                    time_ns = int(datetime.datetime.utcnow().timestamp() * 1_000_000_000)
+                    write_api.write(
+                        bucket=self.bucket,
+                        org=self.org,
+                        record=point
+                    )
+                finally:
+                    write_api.close()
 
-            point = {
-                "measurement": "system_metrics",
-                "time": time_ns,
-                "fields": fields,
-                "tags": {"source": "flask_api"}
-            }
+                print("✅ Metric écrite dans InfluxDB", flush=True)
+                return
 
-            write_api = client.write_api(write_options=SYNCHRONOUS)
-            write_api.write(bucket=self.bucket, org=self.org, record=point)
-            write_api.close()
-        except Exception as e:
-            print(f"⚠️  Erreur d'écriture InfluxDB: {e}")
+            except Exception as e:
+                print(
+                    f"❌ Erreur écriture InfluxDB: {type(e).__name__}: {e}",
+                    flush=True
+                )
 
-    def get_history(self, window: str = "1h", limit: int = 100) -> List[Dict[str, Any]]:
-        """
-        Récupère l'historique des métriques.
-        - window: période (1h, 6h, 12h, 24h, 1d, 7d, 30d)
-        - limit: nombre maximum de résultats
-        """
-        if window not in self.ALLOWED_WINDOWS:
-            raise ValueError(
-                f"Fenêtre non supportée: {window}. "
-                f"Utilisez: {', '.join(self.ALLOWED_WINDOWS.keys())}"
+        # JSONL fallback.
+        local_metric = dict(data)
+        local_metric["timestamp"] = timestamp.isoformat()
+
+        self._write_local(local_metric)
+    def get_history(
+        self,
+        window: str = "24h",
+        limit: int = 100
+    ) -> list[dict[str, Any]]:
+
+        limit = max(1, min(int(limit), 5000))
+
+        if self.influx_enabled and self._influx_client is not None:
+
+            flux_window = self.ALLOWED_WINDOWS.get(
+                str(window).strip(),
+                "24h"
             )
 
-        client = self._get_influx_client()
-        if not client:
-            return self._read_jsonl(limit)
-
-        try:
             flux = f'''
-            from(bucket: "{self.bucket}")
-                |> range(start: -{window})
-                |> filter(fn: (r) => r["_measurement"] == "system_metrics")
-                |> pivot(
-                    rowKey: ["_time"],
-                    columnKey: ["_field"],
-                    valueColumn: "_value"
+from(bucket: "{self.bucket}")
+    |> range(start: -{flux_window})
+    |> filter(fn: (r) => r["_measurement"] == "system_metrics")
+    |> pivot(
+        rowKey: ["_time"],
+        columnKey: ["_field"],
+        valueColumn: "_value"
+    )
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: {limit})
+'''
+
+            try:
+                query_api = self._influx_client.query_api()
+
+                tables = query_api.query(
+                    query=flux,
+                    org=self.org
                 )
-                |> sort(columns: ["_time"], desc: true)
-                |> limit(n: {limit})
-            '''
 
-            query_api = client.query_api()
-            result = query_api.query(org=self.org, query=flux)
+                results = []
 
-            metrics = []
-            for table in result:
-                for record in table.records:
-                    timestamp = record.get_time()
-                    if timestamp:
-                        if hasattr(timestamp, 'isoformat'):
-                            timestamp_str = timestamp.isoformat() + "Z"
-                        else:
-                            timestamp_str = str(timestamp)
-                    else:
-                        timestamp_str = datetime.datetime.utcnow().isoformat() + "Z"
+                ignored_keys = {
+                    "_start",
+                    "_stop",
+                    "_measurement",
+                    "_field",
+                    "_value",
+                    "result",
+                    "table",
+                    "start",
+                    "stop"
+                }
 
-                    raw = {}
-                    for key, value in record.values.items():
-                        if key not in ["_time", "_measurement", "_field", "_value", "result", "table"]:
+                for table in tables:
+                    for record in table.records:
+
+                        values = record.values
+
+                        raw = {}
+
+                        for key, value in values.items():
+
+                            if key in ignored_keys:
+                                continue
+
+                            if key.startswith("_"):
+                                continue
+
                             raw[key] = value
 
-                    for key, value in record.values.items():
-                        if key not in ["_time", "_measurement", "result", "table"]:
-                            raw[key] = value
+                        timestamp = values.get("_time")
 
-                    metrics.append({
-                        "timestamp": timestamp_str,
-                        "raw": raw
-                    })
+                        if timestamp is None:
+                            timestamp = datetime.now(timezone.utc)
 
-            return metrics
+                        if hasattr(timestamp, "isoformat"):
+                            timestamp = timestamp.isoformat()
 
-        except Exception as e:
-            print(f"⚠️  Erreur de requête InfluxDB: {e}")
-            return self._read_jsonl(limit)
+                        results.append(
+                            {
+                                "timestamp": timestamp,
+                                "raw": raw
+                            }
+                        )
 
+                return results
+
+            except Exception as e:
+                print(
+                    f"⚠️ Erreur lecture InfluxDB: {e}"
+                )
+
+        return self._read_jsonl(limit=limit)
     def get_latest(self) -> Optional[Dict[str, Any]]:
         """
         Retourne la dernière métrique disponible.
@@ -243,3 +305,8 @@ class MetricsStore:
                 status["status"] = "degraded"
 
         return status
+
+
+
+
+
