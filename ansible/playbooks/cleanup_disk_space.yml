@@ -1,0 +1,51 @@
+﻿---
+# Playbook de remédiation : libération d'espace disque.
+# Correspond à l'action "libération d'espace disque" citée dans le cahier des charges.
+
+- name: Remédiation - libération d'espace disque
+  hosts: "{{ target_hosts | default('remediation_targets') }}"
+  gather_facts: false
+
+  vars:
+    target_path: "/var/log"
+    older_than_days: 7
+
+  tasks:
+
+    - name: Vérifier l'espace disque disponible avant remédiation
+      ansible.builtin.shell: df -h {{ target_path }}
+      register: disk_before
+      changed_when: false
+
+    - name: Afficher l'espace disque avant remédiation
+      ansible.builtin.debug:
+        var: disk_before.stdout_lines
+
+    - name: Rechercher les fichiers plus vieux que {{ older_than_days }} jours
+      ansible.builtin.find:
+        paths: "{{ target_path }}"
+        age: "{{ older_than_days }}d"
+        recurse: true
+        file_type: file
+      register: old_files
+
+    - name: Journaliser les fichiers ciblés
+      ansible.builtin.debug:
+        msg: "{{ old_files.matched }} fichier(s) concerné(s) dans {{ target_path }}"
+
+    - name: Supprimer effectivement les fichiers identifiés
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ old_files.files }}"
+      loop_control:
+        label: "{{ item.path }}"
+
+    - name: Vérifier l'espace disque disponible après remédiation
+      ansible.builtin.shell: df -h {{ target_path }}
+      register: disk_after
+      changed_when: false
+
+    - name: Afficher l'espace disque après remédiation
+      ansible.builtin.debug:
+        var: disk_after.stdout_lines

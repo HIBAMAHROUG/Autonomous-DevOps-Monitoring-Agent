@@ -1,0 +1,42 @@
+﻿---
+# Playbook de remédiation : redémarrage d'un service systemd au niveau OS.
+
+- name: Remédiation - redémarrage de service OS
+  hosts: "{{ target_hosts | default('remediation_targets') }}"
+  gather_facts: false
+
+  vars:
+    service_name: ""
+
+  tasks:
+
+    - name: Vérifier que service_name est fourni
+      ansible.builtin.fail:
+        msg: "La variable 'service_name' est obligatoire"
+      when: service_name | length == 0
+
+    - name: Relever l'état du service avant remédiation
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+      register: service_before
+      check_mode: true
+
+    - name: Afficher l'état avant remédiation
+      ansible.builtin.debug:
+        msg: "État avant : {{ service_before.status.ActiveState | default('inconnu') }}"
+
+    - name: Redémarrer le service
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+        state: restarted
+
+    - name: Vérifier que le service est actif après redémarrage
+      ansible.builtin.systemd:
+        name: "{{ service_name }}"
+      register: service_after
+      check_mode: true
+
+    - name: Échouer explicitement si le service n'est pas actif après redémarrage
+      ansible.builtin.fail:
+        msg: "Le service {{ service_name }} n'est pas actif après remédiation (état: {{ service_after.status.ActiveState | default('inconnu') }})"
+      when: service_after.status.ActiveState is not defined or service_after.status.ActiveState != "active"
