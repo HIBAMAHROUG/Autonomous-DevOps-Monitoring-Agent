@@ -141,6 +141,60 @@ def _send_email(
         return False
 
 
+def notify_agent_offline(
+    reason: str,
+    since: str,
+) -> bool:
+    """
+    Alerte "Agent Offline" (Bug 3) : envoyée quand la connexion à l'API
+    Kubernetes est perdue depuis plus de 5 minutes.
+
+    Utilise un canal secondaire dédié (AGENT_OFFLINE_WEBHOOK_URL), distinct
+    du webhook Slack utilisé pour les approbations, pour rester joignable
+    même si le canal principal dépend lui aussi de l'infrastructure en panne.
+    Retombe sur SLACK_WEBHOOK_URL si aucun canal secondaire n'est configuré.
+    """
+    webhook_url = os.getenv("AGENT_OFFLINE_WEBHOOK_URL") or os.getenv(
+        "SLACK_WEBHOOK_URL"
+    )
+
+    if not webhook_url:
+        logger.critical(
+            "AGENT OFFLINE depuis %s : %s "
+            "(aucun webhook configuré pour relayer l'alerte)",
+            since,
+            reason,
+        )
+        return False
+
+    payload = {
+        "text": (
+            ":red_circle: *Agent DevOps hors ligne* :red_circle:\n"
+            f"Raison : {reason}\n"
+            f"Depuis : {since}\n"
+            "L'agent ne peut plus exécuter ni vérifier ses actions de "
+            "remédiation sur le cluster tant que la connexion n'est pas "
+            "rétablie."
+        )
+    }
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            timeout=5,
+        )
+        response.raise_for_status()
+        return True
+
+    except requests.RequestException:
+        logger.exception(
+            "Échec de l'envoi de l'alerte Agent Offline (depuis %s)",
+            since,
+        )
+        return False
+
+
 def notify_approval_required(
     action_id: str,
     executor: str,
