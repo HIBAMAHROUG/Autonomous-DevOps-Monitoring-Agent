@@ -5,6 +5,7 @@ import os
 from . import audit_store_sqlite as _sqlite
 from . import audit_store_postgres as _postgres
 
+
 def _backend():
     backend = os.getenv(
         "AUDIT_BACKEND",
@@ -16,11 +17,14 @@ def _backend():
 
     return _sqlite
 
+
 def init_db() -> None:
     _backend().init_db()
 
+
 def reset_db() -> None:
     _backend().reset_db()
+
 
 def append_audit_entry(
     timestamp: str,
@@ -35,11 +39,14 @@ def append_audit_entry(
         message,
     )
 
+
 def load_audit_log():
     return _backend().load_audit_log()
 
+
 def upsert_approval(request):
     _backend().upsert_approval(request)
+
 
 def load_approvals():
     return _backend().load_approvals()
