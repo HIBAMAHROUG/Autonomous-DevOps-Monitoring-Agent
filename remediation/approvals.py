@@ -7,6 +7,8 @@ from datetime import datetime, timezone
 from enum import Enum
 from typing import Any
 
+from storage import audit_store
+
 
 class ApprovalStatus(str, Enum):
     PENDING = "PENDING"
@@ -45,10 +47,37 @@ class ApprovalRequest:
             "decided_by": self.decided_by,
         }
 
+    @classmethod
+    def from_dict(cls, data: dict[str, Any]) -> "ApprovalRequest":
+        """Reconstruit une requête à partir d'une ligne persistée."""
+        return cls(
+            action_id=data["action_id"],
+            executor=data["executor"],
+            params=data.get("params") or {},
+            severity=data["severity"],
+            reason=data["reason"],
+            requested_at=datetime.fromisoformat(data["requested_at"]),
+            status=ApprovalStatus(data["status"]),
+            decided_at=(
+                datetime.fromisoformat(data["decided_at"])
+                if data.get("decided_at")
+                else None
+            ),
+            decided_by=data.get("decided_by"),
+        )
+
 
 class ApprovalStore:
-    def __init__(self) -> None:
+    def __init__(self, persist: bool = False) -> None:
         self._requests: dict[str, ApprovalRequest] = {}
+        self.persist = persist
+
+        if self.persist:
+            # Recharge les demandes d'approbation déjà connues depuis le
+            # stockage partagé (ex: redémarrage du service).
+            for row in audit_store.load_approvals():
+                request = ApprovalRequest.from_dict(row)
+                self._requests[request.action_id] = request
 
     def create(
         self,
@@ -68,6 +97,10 @@ class ApprovalStore:
         )
 
         self._requests[action_id] = request
+
+        if self.persist:
+            audit_store.upsert_approval(request.to_dict())
+
         return request
 
     def get(self, action_id: str) -> ApprovalRequest | None:
@@ -114,6 +147,9 @@ class ApprovalStore:
 
         request.decided_at = datetime.now(timezone.utc)
         request.decided_by = decided_by
+
+        if self.persist:
+            audit_store.upsert_approval(request.to_dict())
 
         return request
 

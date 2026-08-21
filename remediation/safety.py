@@ -4,6 +4,8 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
+from storage import audit_store
+
 
 @dataclass
 class SafetyConfig:
@@ -34,9 +36,20 @@ class SafetyState:
 
 class SafetyPolicy:
 
-    def __init__(self, config: SafetyConfig | None = None):
+    def __init__(
+        self,
+        config: SafetyConfig | None = None,
+        persist: bool = False,
+    ):
         self.config = config or SafetyConfig()
         self.state = SafetyState()
+        self.persist = persist
+
+        if self.persist:
+            # Recharge le journal d'audit depuis le stockage partagé afin
+            # qu'une nouvelle instance (ex: redémarrage du service) retrouve
+            # l'historique des décisions déjà prises.
+            self.state.audit_log = audit_store.load_audit_log()
 
     def check(
         self,
@@ -168,11 +181,21 @@ class SafetyPolicy:
         message: str,
     ) -> None:
 
+        timestamp = datetime.now().isoformat()
+
         self.state.audit_log.append(
             {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": timestamp,
                 "action_id": action_id,
                 "success": success,
                 "message": message,
             }
         )
+
+        if self.persist:
+            audit_store.append_audit_entry(
+                timestamp,
+                action_id,
+                success,
+                message,
+            )
