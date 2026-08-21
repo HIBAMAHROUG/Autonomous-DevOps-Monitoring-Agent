@@ -54,6 +54,7 @@ Ne jamais committer le fichier .env.
 | PROMETHEUS_URL | URL Prometheus |
 | PROMETHEUS_TOKEN | Token Prometheus optionnel |
 | SLACK_WEBHOOK_URL | Webhook Slack |
+| AGENT_OFFLINE_WEBHOOK_URL | Webhook secondaire pour l'alerte "Agent Offline" (Bug 3 : perte de connexion Kubernetes > 5 min). Retombe sur SLACK_WEBHOOK_URL si absent. |
 | SMTP_HOST | Serveur SMTP |
 | SMTP_PORT | Port SMTP |
 | SMTP_USER | Utilisateur SMTP |
@@ -136,6 +137,8 @@ Les actions passent par SafetyPolicy avant exécution.
 - limitation du blast radius
 - approbation humaine pour les actions critiques
 - dry-run par défaut
+- retry avec backoff exponentiel sur les erreurs de connexion kubectl,
+  et alerte "Agent Offline" après 5 minutes de panne (executor/kubectl_client.py)
 
 ## Déploiement
 

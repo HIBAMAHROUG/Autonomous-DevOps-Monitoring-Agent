@@ -1,17 +1,28 @@
 ﻿from __future__ import annotations
 
 import json
+import os
 import sqlite3
 from pathlib import Path
 from typing import Any
 
-DB_PATH = Path("data/audit.sqlite3")
+
+def _db_path() -> Path:
+    """
+    Lit AUDIT_DB_PATH à chaque appel (et non au moment de l'import) afin que
+    l'isolation des tests mise en place par conftest.py fonctionne réellement,
+    et que la valeur par défaut reste data/audit.sqlite3 en usage normal.
+    """
+    return Path(os.getenv("AUDIT_DB_PATH", "data/audit.sqlite3"))
+
 
 def _connect() -> sqlite3.Connection:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    path = _db_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(path)
     conn.row_factory = sqlite3.Row
     return conn
+
 
 def init_db() -> None:
     with _connect() as conn:
@@ -45,12 +56,14 @@ def init_db() -> None:
 
         conn.commit()
 
+
 def reset_db() -> None:
     init_db()
     with _connect() as conn:
         conn.execute("DELETE FROM audit_log")
         conn.execute("DELETE FROM approval_requests")
         conn.commit()
+
 
 def append_audit_entry(
     timestamp: str,
@@ -76,6 +89,7 @@ def append_audit_entry(
         )
         conn.commit()
 
+
 def load_audit_log() -> list[dict[str, Any]]:
     init_db()
     with _connect() as conn:
@@ -96,6 +110,7 @@ def load_audit_log() -> list[dict[str, Any]]:
         }
         for row in rows
     ]
+
 
 def upsert_approval(
     request: dict[str, Any],
@@ -141,11 +156,13 @@ def upsert_approval(
                 request["severity"],
                 request["reason"],
                 request["requested_at"],
+                request["status"],
                 request.get("decided_at"),
                 request.get("decided_by"),
             ),
         )
         conn.commit()
+
 
 def load_approvals() -> list[dict[str, Any]]:
     init_db()
