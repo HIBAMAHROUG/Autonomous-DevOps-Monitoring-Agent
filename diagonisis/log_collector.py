@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import requests
 
@@ -6,6 +7,11 @@ import requests
 LOKI_URL = os.getenv("LOKI_URL", "http://localhost:3100")
 MAX_LINES = 500
 MAX_DURATION = 5
+
+# Filtrage par mot entier (limite de mot \b) pour éviter les faux positifs
+# du type "ERROR_CODE=0" ou "NOERROR" qui seraient capturés par un simple
+# "in" sur la chaîne en majuscules.
+LEVEL_PATTERN = re.compile(r"\b(WARN|WARNING|ERROR|FATAL)\b", re.IGNORECASE)
 
 
 class LogCollectionError(Exception):
@@ -28,7 +34,7 @@ def get_pod_logs(pod, namespace="default"):
         response = requests.get(
             url,
             params=params,
-            timeout=(1, MAX_DURATION),
+            timeout=(2, MAX_DURATION),
         )
 
         response.raise_for_status()
@@ -53,10 +59,7 @@ def get_pod_logs(pod, namespace="default"):
         filtered_logs = [
             log
             for log in logs
-            if any(
-                level in log["message"].upper()
-                for level in ["WARN", "ERROR", "FATAL"]
-            )
+            if LEVEL_PATTERN.search(log["message"])
         ]
 
         elapsed = time.perf_counter() - start_time

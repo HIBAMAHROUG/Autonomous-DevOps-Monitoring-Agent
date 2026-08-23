@@ -1,7 +1,7 @@
 import time
 from datetime import datetime, timezone
 
-from detector.pipeline import check_and_confirm
+from detector.detector import check_metrics
 from logger import logger
 
 from collector.metrics import (
@@ -66,7 +66,7 @@ def collect_metrics():
 
     print("Storage: OK", flush=True)
 
-    alerts = check_and_confirm(metrics)
+    alerts = check_metrics(metrics)
 
     if alerts:
         print(f"Anomaly: {alerts}", flush=True)
@@ -90,9 +90,17 @@ def collect_metrics():
     }
 
 
+COLLECTION_INTERVAL_SECONDS = 30
+
+
 if __name__ == "__main__":
     print("Monitoring Agent started")
-    print("Collection interval: 30 seconds")
+    print(f"Collection interval: {COLLECTION_INTERVAL_SECONDS} seconds")
+
+    # Boucle ancrée sur time.monotonic() : le cycle réel est bien de
+    # COLLECTION_INTERVAL_SECONDS entre deux débuts de collecte, et non
+    # "durée de collecte + 30s" (ce qui dériverait progressivement).
+    next_run = time.monotonic()
 
     while True:
         try:
@@ -106,8 +114,8 @@ if __name__ == "__main__":
             print(f"ERROR: {e}", flush=True)
             logger.exception("Error collecting metrics")
 
-        print("Next collection in 30s...", flush=True)
-        time.sleep(30)
+        next_run += COLLECTION_INTERVAL_SECONDS
+        sleep_time = max(0, next_run - time.monotonic())
 
-
-
+        print(f"Next collection in {sleep_time:.1f}s...", flush=True)
+        time.sleep(sleep_time)
