@@ -1,7 +1,7 @@
-﻿import time
+import time
 from datetime import datetime, timezone
 
-from detector.detector import check_metrics
+from detector.pipeline import check_and_confirm
 from logger import logger
 
 from collector.metrics import (
@@ -66,7 +66,7 @@ def collect_metrics():
 
     print("Storage: OK", flush=True)
 
-    alerts = check_metrics(metrics)
+    alerts = check_and_confirm(metrics)
 
     if alerts:
         print(f"Anomaly: {alerts}", flush=True)

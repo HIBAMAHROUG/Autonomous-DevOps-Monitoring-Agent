@@ -140,6 +140,21 @@ Les actions passent par SafetyPolicy avant exécution.
 - retry avec backoff exponentiel sur les erreurs de connexion kubectl,
   et alerte "Agent Offline" après 5 minutes de panne (executor/kubectl_client.py)
 
+## CI/CD
+
+Le pipeline CI/CD utilise **GitHub Actions** (fichier `.github/workflows/ci.yml`), et non **GitLab CI** comme indiqué initialement dans le cahier des charges.
+
+**Pourquoi cet écart :**
+
+- Le dépôt du projet est hébergé sur GitHub, pas sur GitLab (ni gitlab.com, ni une instance auto-hébergée). Utiliser GitLab CI aurait nécessité de dupliquer le dépôt sur un second hébergeur, ou de connecter un GitLab externe uniquement pour l'intégration continue.
+- GitHub Actions est intégré nativement au dépôt : aucun outil supplémentaire à provisionner, aucun runner externe à configurer, et les workflows restent versionnés avec le code.
+- Le pipeline logique décrit au cahier reste respecté à l'identique dans son contenu : installation des dépendances, exécution de la suite de tests (`pytest`), puis build de l'image Docker. Seul l'outil d'exécution change.
+
+**Ce qui est exécuté à chaque push/pull request sur `main` :**
+
+1. Job `test` : checkout, installation de Python 3.13, installation des dépendances (`requirements.txt`), exécution de `python -m pytest -q`.
+2. Job `docker-build` (dépend de `test`) : build de l'image `autonomous-devops-agent:test` à partir du `Dockerfile`.
+
 ## Déploiement
 
  docker build -t autonomous-devops-agent .

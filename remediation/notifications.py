@@ -195,6 +195,68 @@ def notify_agent_offline(
         return False
 
 
+def notify_remediation_failed(
+    action_id: str,
+    component: str,
+    metric: str,
+    value: float,
+    threshold: float,
+) -> dict[str, Any]:
+    """
+    US 3.2 : envoyée quand, après exécution d'une action de remédiation et
+    un délai d'observation, la métrique concernée n'est pas revenue sous le
+    seuil normal. L'incident est alors escaladé à l'équipe de garde.
+    """
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+
+    text = (
+        ":warning: *Remédiation sans effet* :warning:\n"
+        f"Action `{action_id}` exécutée sur `{component}` mais le "
+        f"problème persiste.\n"
+        f"Métrique `{metric}` = {value:.2f} (seuil attendu : {threshold:.2f})\n"
+        f"Escalade à l'équipe de garde requise."
+    )
+
+    if not webhook_url:
+        logger.warning(
+            "Remédiation sans effet pour %s sur %s (%s=%.2f, seuil=%.2f) "
+            "— aucun SLACK_WEBHOOK_URL configuré pour escalader.",
+            action_id,
+            component,
+            metric,
+            value,
+            threshold,
+        )
+        return {"slack": False, "email": False}
+
+    results: dict[str, Any] = {"slack": False, "email": False}
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json={"text": text},
+            timeout=5,
+        )
+        response.raise_for_status()
+        results["slack"] = True
+
+    except requests.RequestException:
+        logger.exception(
+            "Échec de l'envoi de l'alerte de remédiation sans effet pour %s",
+            action_id,
+        )
+
+    results["email"] = _send_email(
+        action_id,
+        component,
+        "CRITICAL",
+        f"Remédiation sans effet : {metric}={value:.2f} "
+        f"(seuil {threshold:.2f})",
+    )
+
+    return results
+
+
 def notify_approval_required(
     action_id: str,
     executor: str,
@@ -235,4 +297,4 @@ def notify_approval_required(
             action_id,
         )
 
-    return results
+    return resultss
