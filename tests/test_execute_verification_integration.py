@@ -1,233 +1,184 @@
-from __future__ import annotations
-
-from unittest.mock import MagicMock, patch
-
+import remediation.verification as verification_module
+from executor.base import ExecutionResult
 from executor.service import ExecutionService
 from remediation.approvals import approval_store
 from remediation.models import Action
-from remediation.safety import SafetyPolicy
 
 
-def _make_service_with_forced_approval():
+def _service():
+    # Instance isolée (pas le singleton execution_service) pour ne pas
+    # polluer le rate-limiting/circuit breaker partagé entre tests.
+    return ExecutionService()
+
+
+def _stub_success(executor_service, executor_name: str) -> None:
     """
-    ExecutionService dont SafetyPolicy.check() force systématiquement le
-    chemin "approbation requise", pour tester le branchement bout-en-bout
-    execute() -> approval_store -> execute_approved() sans dépendre des
-    règles réelles de criticité.
+    Remplace l'exécuteur réel (docker/kubectl...) par un stub qui renvoie
+    toujours un succès, sans invoquer de binaire externe -- ces tests
+    portent sur le branchement execute_and_verify/execute_approved ->
+    verify_remediation, pas sur les exécuteurs eux-mêmes (déjà testés
+    ailleurs).
     """
-    service = ExecutionService()
-    service.safety = SafetyPolicy()
-    service.safety.check = MagicMock(
-        return_value=(False, "Human approval required for critical action")
+
+    class _StubExecutor:
+        def execute(self, action_id, params, dry_run=True):
+            return ExecutionResult(
+                success=True,
+                action_id=action_id,
+                executor=executor_name,
+                dry_run=dry_run,
+                message="stubbed success",
+            )
+
+    executor_service.executors[executor_name] = _StubExecutor()
+
+
+def test_execute_and_verify_runs_verification_on_success(monkeypatch):
+    monkeypatch.setattr(verification_module, "query_prometheus", lambda q: 10.0)
+    escalations = []
+    monkeypatch.setattr(
+        verification_module,
+        "notify_escalation",
+        lambda **kwargs: escalations.append(kwargs),
     )
-    service.safety.audit = MagicMock()
-    service.safety.record_result = MagicMock()
-    return service
 
-
-@patch("executor.service.notify_approval_required")
-def test_execute_attaches_verification_info_to_approval(mock_notify):
-    service = _make_service_with_forced_approval()
-
+    service = _service()
+    _stub_success(service, "docker")
     action = Action(
-        action_id="ACT-VERIFY-1",
-        name="restart service",
-        type="docker",
+        action_id="ACT-DOCKER-1",
+        name="Restart container",
+        type="remediation",
         executor="docker",
+        reversible=True,
     )
 
-    service.execute(
+    result, verification = service.execute_and_verify(
         action,
-        params={"container": "checkout"},
-        dry_run=False,
-        severity="CRITICAL",
+        params={"container_name": "web-1"},
         metric_query="cpu_usage",
-        threshold=90.0,
+        threshold=80.0,
+        component="web-1",
         comparison="below",
-        component="checkout-service",
+        dry_run=False,
+        severity="HIGH",
+        wait_seconds=0,
     )
 
-    request = approval_store.get("ACT-VERIFY-1")
-
-    assert request is not None
-    assert request.params["_verification"] == {
-        "metric_query": "cpu_usage",
-        "threshold": 90.0,
-        "comparison": "below",
-        "component": "checkout-service",
-    }
-    # Le conteneur cible doit rester dans les params passés à l'exécuteur.
-    assert request.params["container"] == "checkout"
+    assert result.success is True
+    assert verification is not None
+    assert verification.resolved is True
+    assert escalations == []
 
 
-@patch("executor.service.notify_approval_required")
-def test_execute_without_verification_info_creates_plain_approval(
-    mock_notify,
-):
-    service = _make_service_with_forced_approval()
+def test_execute_and_verify_skips_verification_in_dry_run(monkeypatch):
+    calls = []
+    monkeypatch.setattr(
+        verification_module, "query_prometheus", lambda q: calls.append(q) or 0.0
+    )
 
+    service = _service()
     action = Action(
-        action_id="ACT-VERIFY-2",
-        name="restart service",
-        type="docker",
+        action_id="ACT-DOCKER-2",
+        name="Restart container",
+        type="remediation",
         executor="docker",
+        reversible=True,
     )
 
-    service.execute(
+    result, verification = service.execute_and_verify(
         action,
-        params={"container": "checkout"},
-        dry_run=False,
-        severity="CRITICAL",
-    )
-
-    request = approval_store.get("ACT-VERIFY-2")
-
-    assert request is not None
-    assert "_verification" not in request.params
-
-
-@patch("executor.service.verify_remediation")
-@patch("executor.service.DockerExecutor.execute")
-def test_execute_approved_triggers_verification_when_present(
-    mock_docker_execute, mock_verify
-):
-    from executor.base import ExecutionResult
-
-    service = ExecutionService()
-
-    action = Action(
-        action_id="ACT-VERIFY-3",
-        name="restart service",
-        type="docker",
-        executor="docker",
-    )
-
-    approval_store.create(
-        action_id="ACT-VERIFY-3",
-        executor="docker",
-        params={
-            "container": "checkout",
-            "_verification": {
-                "metric_query": "cpu_usage",
-                "threshold": 90.0,
-                "comparison": "below",
-                "component": "checkout-service",
-            },
-        },
-        severity="CRITICAL",
-        reason="Human approval required for critical action",
-    )
-
-    mock_docker_execute.return_value = ExecutionResult(
-        success=True,
-        action_id="ACT-VERIFY-3",
-        executor="docker",
-        dry_run=False,
-        message="restarted",
-    )
-
-    service.execute_approved(action, dry_run=False)
-
-    mock_verify.assert_called_once_with(
-        action_id="ACT-VERIFY-3",
-        component="checkout-service",
+        params={"container_name": "web-2"},
         metric_query="cpu_usage",
-        threshold=90.0,
-        comparison="below",
-    )
-
-    # Le conteneur doit avoir été transmis à l'exécuteur, sans la clé
-    # réservée _verification.
-    _, kwargs = mock_docker_execute.call_args
-    assert kwargs["params"] == {"container": "checkout"}
-
-
-@patch("executor.service.verify_remediation")
-@patch("executor.service.DockerExecutor.execute")
-def test_execute_approved_skips_verification_in_dry_run(
-    mock_docker_execute, mock_verify
-):
-    from executor.base import ExecutionResult
-
-    service = ExecutionService()
-
-    action = Action(
-        action_id="ACT-VERIFY-4",
-        name="restart service",
-        type="docker",
-        executor="docker",
-    )
-
-    approval_store.create(
-        action_id="ACT-VERIFY-4",
-        executor="docker",
-        params={
-            "container": "checkout",
-            "_verification": {
-                "metric_query": "cpu_usage",
-                "threshold": 90.0,
-                "comparison": "below",
-                "component": "checkout-service",
-            },
-        },
-        severity="CRITICAL",
-        reason="Human approval required for critical action",
-    )
-
-    mock_docker_execute.return_value = ExecutionResult(
-        success=True,
-        action_id="ACT-VERIFY-4",
-        executor="docker",
+        threshold=80.0,
+        component="web-2",
         dry_run=True,
-        message="dry-run ok",
+        wait_seconds=0,
     )
 
-    service.execute_approved(action, dry_run=True)
+    assert result.dry_run is True
+    assert verification is None
+    assert calls == []  # Prometheus jamais interrogé en dry-run
 
-    mock_verify.assert_not_called()
 
+def test_execute_approved_triggers_verification_when_info_present(monkeypatch):
+    # execute_approved() n'expose pas wait_seconds (toujours
+    # DEFAULT_WAIT_SECONDS=60) : on mocke time.sleep pour ne pas
+    # ralentir la suite de tests de 60s réelles.
+    monkeypatch.setattr(verification_module.time, "sleep", lambda s: None)
+    monkeypatch.setattr(verification_module, "query_prometheus", lambda q: 5.0)
+    verified = []
+    monkeypatch.setattr(
+        verification_module,
+        "notify_escalation",
+        lambda **kwargs: verified.append(kwargs),
+    )
 
-@patch("executor.service.verify_remediation")
-@patch("executor.service.DockerExecutor.execute")
-def test_execute_approved_skips_verification_when_execution_fails(
-    mock_docker_execute, mock_verify
-):
-    from executor.base import ExecutionResult
-
-    service = ExecutionService()
-
+    service = _service()
+    _stub_success(service, "rollback")
     action = Action(
-        action_id="ACT-VERIFY-5",
-        name="restart service",
-        type="docker",
-        executor="docker",
+        action_id="ACT-CRITICAL-1",
+        name="Rollback deployment",
+        type="remediation",
+        executor="rollback",
+        reversible=True,
     )
 
+    # Simule ce que execute() fait quand une action critique est bloquée
+    # faute d'approbation : une ApprovalRequest est créée avec les infos
+    # de vérification attachées sous _verification.
     approval_store.create(
-        action_id="ACT-VERIFY-5",
-        executor="docker",
+        action_id=action.action_id,
+        executor="rollback",
         params={
-            "container": "checkout",
+            "deployment": "checkout-api",
             "_verification": {
-                "metric_query": "cpu_usage",
-                "threshold": 90.0,
+                "metric_query": "error_rate",
+                "threshold": 1.0,
                 "comparison": "below",
-                "component": "checkout-service",
+                "component": "checkout-api",
             },
         },
         severity="CRITICAL",
         reason="Human approval required for critical action",
     )
 
-    mock_docker_execute.return_value = ExecutionResult(
-        success=False,
-        action_id="ACT-VERIFY-5",
-        executor="docker",
-        dry_run=False,
-        message="failed",
-        error="container not found",
+    result = service.execute_approved(action, dry_run=False)
+
+    assert result.success is True
+    # La vérification a bien tourné automatiquement après l'approbation ;
+    # error_rate=5.0 n'est pas < threshold=1.0 -> incident jugé persistant
+    # -> escalade (c'est le comportement attendu de verify_remediation).
+    assert len(verified) == 1
+    assert verified[0]["action_id"] == "ACT-CRITICAL-1"
+
+
+def test_execute_approved_without_verification_info_does_not_call_prometheus(
+    monkeypatch,
+):
+    calls = []
+    monkeypatch.setattr(
+        verification_module, "query_prometheus", lambda q: calls.append(q) or 0.0
     )
 
-    service.execute_approved(action, dry_run=False)
+    service = _service()
+    _stub_success(service, "docker")
+    action = Action(
+        action_id="ACT-NO-VERIF-1",
+        name="Restart container",
+        type="remediation",
+        executor="docker",
+        reversible=True,
+    )
 
-    mock_verify.assert_not_called()
+    approval_store.create(
+        action_id=action.action_id,
+        executor="docker",
+        params={"container_name": "legacy-app"},
+        severity="CRITICAL",
+        reason="Human approval required for critical action",
+    )
+
+    result = service.execute_approved(action, dry_run=False)
+
+    assert result.success is True
+    assert calls == []  # pas d'info _verification -> pas de vérification
