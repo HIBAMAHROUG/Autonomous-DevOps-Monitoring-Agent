@@ -1,11 +1,11 @@
-﻿import os
+import os
 import time
 import requests
 
 
 LOKI_URL = os.getenv("LOKI_URL", "http://localhost:3100")
-MAX_LINES = 100
-MAX_DURATION = 10
+MAX_LINES = 500
+MAX_DURATION = 5
 
 
 class LogCollectionError(Exception):
@@ -28,7 +28,7 @@ def get_pod_logs(pod, namespace="default"):
         response = requests.get(
             url,
             params=params,
-            timeout=(2, MAX_DURATION),
+            timeout=(1, MAX_DURATION),
         )
 
         response.raise_for_status()

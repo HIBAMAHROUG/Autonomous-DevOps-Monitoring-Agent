@@ -1,4 +1,12 @@
-﻿name: Autonomous DevOps Agent CI
+﻿# CI/CD : GitHub Actions (et non GitLab CI comme mentionné au cahier des
+# charges initial). Écart documenté volontairement : le dépôt est hébergé
+# sur GitHub (pas sur un GitLab auto-hébergé ou gitlab.com), et GitHub
+# Actions permet d'exécuter les tests et de builder l'image Docker sans
+# dépendance à un second outil ni à des runners externes à configurer.
+# Le pipeline logique (installation des dépendances, tests, build Docker)
+# reste équivalent à ce qui était prévu avec GitLab CI. Détails dans le
+# README, section "CI/CD".
+name: Autonomous DevOps Agent CI
 
 on:
   push:

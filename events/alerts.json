@@ -1,10 +1,10 @@
 [
     {
-        "service": "svc-a",
+        "service": "svc-c",
         "metric": "CPU",
         "value": 95,
         "threshold": 90,
-        "sustained_seconds": 300.0,
+        "sustained_seconds": 20298766.8,
         "severity": "CRITICAL"
     }
 ]

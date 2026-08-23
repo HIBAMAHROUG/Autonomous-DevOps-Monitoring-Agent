@@ -1,7 +1,6 @@
 version: "3.8"
 
 services:
-
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
@@ -20,26 +19,53 @@ services:
     restart: always
 
   prometheus:
-    image: prom/prometheus
+    image: prom/prometheus:latest
     container_name: prometheus
     ports:
       - "9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.enable-lifecycle'
     restart: always
 
-
   node-exporter:
-    image: prom/node-exporter
+    image: prom/node-exporter:latest
     container_name: node-exporter
     ports:
       - "9100:9100"
+    command:
+      - '--path.rootfs=/host'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: always
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_AUTH_ANONYMOUS_ENABLED=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
     restart: always
 
   api:
     build: .
     container_name: monitoring-api
-    command: python -m app
+    command: python -m api.app
     ports:
       - "5000:5000"
     environment:
@@ -48,9 +74,16 @@ services:
       INFLUX_BUCKET: ai-agent
       INFLUX_TOKEN: monitoring-token
       METRICS_RETENTION_DAYS: "30"
+      AUDIT_BACKEND: sqlite
+      AUDIT_DB_PATH: /app/data/audit.sqlite3
+      PYTHONUNBUFFERED: 1
+    volumes:
+      - ./data:/app/data
     depends_on:
       - influxdb
     restart: always
 
 volumes:
   influxdb-data:
+  prometheus-data:
+  grafana-data:
