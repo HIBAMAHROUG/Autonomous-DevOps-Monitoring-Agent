@@ -1,56 +1,70 @@
 [
   {
-    "action_id": "ACT-RESTART-SVC",
-    "name": "Restart service",
+    "action_id": "ACT-RESTART-POD",
+    "name": "Restart pod container",
     "type": "remediation",
-    "executor": "ssm_run_command",
+    "executor": "docker",
     "params_schema": {
-      "service_name": "string",
-      "instance_id": "string"
+      "container_name": "string"
     },
     "risk_level": "medium",
     "reversible": true,
-    "avg_resolution_time_s": 45,
-    "success_rate_historical": 0.87
+    "avg_resolution_time_s": 30,
+    "success_rate_historical": 0.85
   },
   {
     "action_id": "ACT-SCALE-OUT",
-    "name": "Scale out worker group",
+    "name": "Scale out deployment",
     "type": "remediation",
-    "executor": "terraform_apply",
+    "executor": "scaling",
     "params_schema": {
-      "asg_name": "string",
+      "deployment": "string",
       "increment": "int"
     },
     "risk_level": "low",
     "reversible": true,
-    "avg_resolution_time_s": 120,
-    "success_rate_historical": 0.91
+    "avg_resolution_time_s": 60,
+    "success_rate_historical": 0.9
   },
   {
-    "action_id": "ACT-CLEAR-CACHE",
-    "name": "Clear application cache",
+    "action_id": "ACT-CLEAN-DISK",
+    "name": "Clean up old log files",
     "type": "remediation",
-    "executor": "ssm_run_command",
+    "executor": "cleanup",
     "params_schema": {
-      "instance_id": "string",
-      "cache_path": "string"
+      "path": "string",
+      "older_than_days": "int"
     },
     "risk_level": "low",
-    "reversible": true,
-    "avg_resolution_time_s": 0.78
+    "reversible": false,
+    "avg_resolution_time_s": 20,
+    "success_rate_historical": 0.8
   },
   {
-    "action_id": "ACT-RESTART-DB-CONN-POOL",
-    "name": "Restart database connection pool",
+    "action_id": "ACT-FAILOVER",
+    "name": "Failover service to standby target",
     "type": "remediation",
-    "executor": "ssm_run_command",
+    "executor": "failover",
     "params_schema": {
-      "service_name": "string"
+      "service": "string",
+      "target": "string"
     },
     "risk_level": "high",
-    "reversible": false,
-    "avg_resolution_time_s": 60,
-    "success_rate_historical": 0.65
+    "reversible": true,
+    "avg_resolution_time_s": 45,
+    "success_rate_historical": 0.75
+  },
+  {
+    "action_id": "ACT-ROLLBACK",
+    "name": "Rollback deployment to previous revision",
+    "type": "remediation",
+    "executor": "rollback",
+    "params_schema": {
+      "deployment": "string"
+    },
+    "risk_level": "high",
+    "reversible": true,
+    "avg_resolution_time_s": 90,
+    "success_rate_historical": 0.82
   }
 ]

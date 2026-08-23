@@ -34,7 +34,7 @@ def get_pod_logs(pod, namespace="default"):
         response = requests.get(
             url,
             params=params,
-            timeout=(2, MAX_DURATION),
+            timeout=(1, MAX_DURATION),
         )
 
         response.raise_for_status()
@@ -81,3 +81,6 @@ def get_pod_logs(pod, namespace="default"):
         raise LogCollectionError(
             f"Unable to retrieve logs from Loki: {exc}"
         ) from exc
+
+
+
