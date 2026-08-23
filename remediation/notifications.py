@@ -195,64 +195,78 @@ def notify_agent_offline(
         return False
 
 
-def notify_remediation_failed(
+def notify_escalation(
     action_id: str,
     component: str,
-    metric: str,
-    value: float,
-    threshold: float,
+    reason: str,
 ) -> dict[str, Any]:
     """
-    US 3.2 : envoyée quand, après exécution d'une action de remédiation et
-    un délai d'observation, la métrique concernée n'est pas revenue sous le
-    seuil normal. L'incident est alors escaladé à l'équipe de garde.
+    Escalade vers l'équipe de garde (US 3.2 / US 2.2), distincte de
+    notify_approval_required : ici il n'y a rien à approuver/rejeter,
+    l'agent a soit renoncé (confiance de diagnostic < 80%), soit constaté
+    que la remédiation automatique n'a pas résolu l'incident.
+
+    Envoie sur les mêmes canaux (Slack/email) que les autres alertes,
+    sans les liens approve/reject.
     """
     webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    results = {"slack": False, "email": False}
 
-    text = (
-        ":warning: *Remédiation sans effet* :warning:\n"
-        f"Action `{action_id}` exécutée sur `{component}` mais le "
-        f"problème persiste.\n"
-        f"Métrique `{metric}` = {value:.2f} (seuil attendu : {threshold:.2f})\n"
-        f"Escalade à l'équipe de garde requise."
-    )
+    if webhook_url:
+        payload = {
+            "text": (
+                ":warning: *Incident escaladé* — `{}` ({})\n"
+                "Raison : {}\n"
+                "Dashboard : {}/dashboard"
+            ).format(action_id, component, reason, API_BASE_URL)
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            response.raise_for_status()
+            results["slack"] = True
+        except requests.RequestException:
+            logger.exception(
+                "Échec de l'envoi de l'escalade Slack pour %s", action_id
+            )
 
-    if not webhook_url:
+    smtp_host = os.getenv("SMTP_HOST")
+    to_addr = os.getenv("APPROVAL_EMAIL_TO")
+
+    if smtp_host and to_addr:
+        from_addr = os.getenv("APPROVAL_EMAIL_FROM", "devops-agent@localhost")
+        message = EmailMessage()
+        message["Subject"] = f"[Agent DevOps] Incident escaladé: {action_id}"
+        message["From"] = from_addr
+        message["To"] = to_addr
+        message.set_content(
+            "Un incident a été escaladé vers une intervention humaine.\n\n"
+            f"Action/incident : {action_id}\n"
+            f"Composant       : {component}\n"
+            f"Raison          : {reason}\n\n"
+            f"Dashboard : {API_BASE_URL}/dashboard\n"
+        )
+        try:
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+                if os.getenv("SMTP_USE_TLS", "true").lower() == "true":
+                    smtp.starttls()
+                smtp_user = os.getenv("SMTP_USER")
+                smtp_password = os.getenv("SMTP_PASSWORD")
+                if smtp_user and smtp_password:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.send_message(message)
+            results["email"] = True
+        except Exception:
+            logger.exception(
+                "Échec de l'envoi de l'email d'escalade pour %s", action_id
+            )
+
+    if not any(results.values()):
         logger.warning(
-            "Remédiation sans effet pour %s sur %s (%s=%.2f, seuil=%.2f) "
-            "— aucun SLACK_WEBHOOK_URL configuré pour escalader.",
-            action_id,
-            component,
-            metric,
-            value,
-            threshold,
-        )
-        return {"slack": False, "email": False}
-
-    results: dict[str, Any] = {"slack": False, "email": False}
-
-    try:
-        response = requests.post(
-            webhook_url,
-            json={"text": text},
-            timeout=5,
-        )
-        response.raise_for_status()
-        results["slack"] = True
-
-    except requests.RequestException:
-        logger.exception(
-            "Échec de l'envoi de l'alerte de remédiation sans effet pour %s",
+            "Aucun canal de notification configuré — incident %s "
+            "escaladé mais personne n'a été notifié en dehors du dashboard.",
             action_id,
         )
-
-    results["email"] = _send_email(
-        action_id,
-        component,
-        "CRITICAL",
-        f"Remédiation sans effet : {metric}={value:.2f} "
-        f"(seuil {threshold:.2f})",
-    )
 
     return results
 
@@ -297,4 +311,4 @@ def notify_approval_required(
             action_id,
         )
 
-    return resultss
+    return results

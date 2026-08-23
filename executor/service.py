@@ -54,7 +54,7 @@ class ExecutionService:
         component: str | None = None,
     ) -> ExecutionResult:
         """
-        Args (nouveaux, tous optionnels — rétrocompatible) :
+        Args (nouveaux, tous optionnels -- rétrocompatible) :
             metric_query, threshold, comparison, component : si fournis et
             que l'action nécessite une approbation humaine, ces infos sont
             attachées à la demande d'approbation (clé réservée
@@ -165,11 +165,16 @@ class ExecutionService:
         US 3.2 : exécute l'action puis vérifie que l'incident est
         réellement résolu.
 
-        - Si `dry_run=True` ou si l'exécution a échoué/été bloquée, aucune
+        - Si `dry_run=True` ou si l'exécution a échoué/été bloquée
+          (y compris bloquée en attente d'approbation), aucune
           vérification n'est effectuée (rien à vérifier).
         - Sinon, attend `wait_seconds` puis revérifie la métrique via
           Prometheus. Si le problème persiste, l'incident est escaladé à
           l'équipe de garde (voir remediation.notifications).
+
+        C'est le point d'entrée à utiliser pour le chemin AUTO_EXECUTE
+        (voir orchestrator.py) : sans lui, une décision AUTO_EXECUTE
+        s'exécutait mais n'était jamais revérifiée.
 
         Retourne (ExecutionResult, VerificationResult | None).
         """
@@ -180,6 +185,10 @@ class ExecutionService:
             dry_run=dry_run,
             severity=severity,
             approved=approved,
+            metric_query=metric_query,
+            threshold=threshold,
+            comparison=comparison,
+            component=component,
         )
 
         if dry_run or not result.success:
