@@ -1,20 +1,11 @@
 cpu:
   threshold: 90
-  duration: 300          # secondes pendant lesquelles le seuil doit rester dépassé
-  trend_multiplier: 1.5  # n'alerte que si la valeur dépasse aussi 1.5x la baseline habituelle
+  duration: 300
+  trend_multiplier: 1.5
 
 memory:
   threshold: 85
   duration: 300
   trend_multiplier: 1.5
 
-# Fenêtres de maintenance / pics prévus (Bug 2) : pendant ces créneaux,
-# l'agent ne déclenche pas d'alerte pour les services listés.
-# Format ISO 8601, timezone UTC recommandée.
-maintenance_windows:
-  # Exemple : campagne marketing planifiée
-  # - name: "campagne_black_friday"
-  #   start: "2026-11-28T00:00:00+00:00"
-  #   end: "2026-11-29T23:59:59+00:00"
-  #   services: ["checkout-service", "api-gateway"]
-  []
+maintenance_windows: []
