@@ -1,0 +1,99 @@
+﻿"""API du tableau de bord (US 4.1)."""
+
+from __future__ import annotations
+
+import os
+
+from flask import Blueprint, jsonify, render_template, request
+
+from executor.service import execution_service
+from remediation.approvals import approval_store
+from remediation.decision_log import decision_log
+import remediation.mttr as mttr
+
+
+dashboard_api = Blueprint("dashboard_api", __name__)
+
+
+def _check_api_key() -> bool:
+    api_key = request.headers.get("X-API-Key")
+    return bool(api_key) and api_key == os.getenv("API_KEY")
+
+
+def _classify_entry(entry: dict) -> str:
+    if entry["message"] == "Human approval required for critical action":
+        return "escalated"
+
+    return "resolved" if entry["success"] else "failed"
+
+
+@dashboard_api.route("/dashboard", methods=["GET"])
+def dashboard_page():
+    """Page HTML du tableau de bord."""
+    return render_template("dashboard.html")
+
+
+@dashboard_api.route("/api/dashboard/summary", methods=["GET"])
+def summary():
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    audit_log = execution_service.safety.get_audit_log()
+
+    counts = {
+        "detected": len(audit_log),
+        "resolved": 0,
+        "escalated": 0,
+        "failed": 0,
+    }
+
+    for entry in audit_log:
+        category = _classify_entry(entry)
+        counts[category] = counts.get(category, 0) + 1
+
+    counts["pending_approval"] = len(
+        approval_store.list_pending()
+    )
+
+    return jsonify(counts)
+
+
+@dashboard_api.route("/api/dashboard/decisions", methods=["GET"])
+def decisions():
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    limit = request.args.get("limit", 50, type=int)
+    stats = mttr.get_stats()
+
+    return jsonify({
+        "recent": decision_log.list_recent(limit=limit),
+        "self_healing_ratio": stats.get("auto_resolution_rate") or 0.0,
+        "total_incidents": stats.get("total_incidents", 0),
+        "avg_mttr_seconds": stats.get("mttr_seconds_avg") or 0,
+    })
+
+
+@dashboard_api.route("/api/dashboard/history", methods=["GET"])
+def history():
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+
+    limit = request.args.get("limit", 50, type=int)
+
+    audit_log = execution_service.safety.get_audit_log()
+
+    entries = [
+        {
+            "timestamp": entry["timestamp"],
+            "action_id": entry["action_id"],
+            "status": _classify_entry(entry),
+            "message": entry["message"],
+        }
+        for entry in reversed(audit_log[-limit:])
+    ]
+
+    return jsonify({
+        "count": len(entries),
+        "history": entries,
+    })

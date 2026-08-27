@@ -4,9 +4,17 @@ from flask_cors import CORS
 import os
 import json
 from datetime import datetime
+from api.dashboard import dashboard_api
+from api.prometheus import prometheus_api
+from api.approvals import approvals_api
+from api.routes import metrics_api
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
 CORS(app)
+app.register_blueprint(dashboard_api)
+app.register_blueprint(prometheus_api)
+app.register_blueprint(approvals_api)
+app.register_blueprint(metrics_api)
 
 # Données simulées pour la démo
 METRICS_DATA = [
@@ -187,3 +195,5 @@ def kill_switch():
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
+
+
