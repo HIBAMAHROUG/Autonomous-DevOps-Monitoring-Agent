@@ -1,7 +1,21 @@
 [
   {
     "action_id": "ACT-RESTART-POD",
-    "name": "Restart pod container",
+    "name": "Restart Kubernetes pod",
+    "type": "remediation",
+    "executor": "k8s_pod_restart",
+    "params_schema": {
+      "pod_name": "string",
+      "namespace": "string"
+    },
+    "risk_level": "medium",
+    "reversible": true,
+    "avg_resolution_time_s": 30,
+    "success_rate_historical": 0.85
+  },
+  {
+    "action_id": "ACT-RESTART-CONTAINER",
+    "name": "Restart Docker container (non-Kubernetes host)",
     "type": "remediation",
     "executor": "docker",
     "params_schema": {

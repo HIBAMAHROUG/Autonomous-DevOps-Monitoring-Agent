@@ -17,6 +17,7 @@ from .base import ExecutionResult
 from .cleanup_executor import CleanupExecutor
 from .docker_executor import DockerExecutor
 from .failover_executor import FailoverExecutor
+from .k8s_pod_executor import K8sPodExecutor
 from .rollback_executor import RollbackExecutor
 from .scaling_executor import ScalingExecutor
 
@@ -32,6 +33,8 @@ class ExecutionService:
         self.executors = {
             "docker": DockerExecutor(),
             "docker_restart": DockerExecutor(),
+            "k8s_pod_restart": K8sPodExecutor(),
+            "kubectl_pod_restart": K8sPodExecutor(),
             "scaling": ScalingExecutor(),
             "kubectl_scale": ScalingExecutor(),
             "cleanup": CleanupExecutor(),
