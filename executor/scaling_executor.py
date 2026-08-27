@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import subprocess
+from remediation.kubectl_client import run_kubectl
 
 from .base import BaseExecutor, ExecutionResult
 
@@ -42,7 +42,7 @@ class ScalingExecutor(BaseExecutor):
         elif increment is not None:
 
             try:
-                current = subprocess.run(
+                current = run_kubectl(
                     [
                         "kubectl",
                         "get",
@@ -51,10 +51,7 @@ class ScalingExecutor(BaseExecutor):
                         "-o",
                         "jsonpath={.spec.replicas}",
                     ],
-                    capture_output=True,
-                    text=True,
                     timeout=30,
-                    check=False,
                 )
 
                 if current.returncode != 0:
@@ -119,13 +116,7 @@ class ScalingExecutor(BaseExecutor):
 
         # EXECUTION REELLE
         try:
-            result = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=60,
-                check=False,
-            )
+            result = run_kubectl(command, timeout=60)
 
             success = result.returncode == 0
 
