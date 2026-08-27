@@ -38,6 +38,8 @@ from remediation.catalog import ActionCatalog, JsonActionCatalog
 from remediation.knowledge_base import JsonKnowledgeBase, KnowledgeBase
 from remediation.models import AnomalyEvent, DecisionMode, Severity
 from remediation.notifications import notify_escalation
+from monitoring import agent_metrics
+from remediation.decision_log import decision_log
 
 CONFIG_DIR = os.path.join(
     os.path.dirname(os.path.abspath(__file__)), "config"
@@ -176,6 +178,17 @@ def handle_alert(
             component=pod,
             reason=f"Log collection failed, cannot diagnose: {exc}",
         )
+        agent_metrics.record_decision("ESCALATE", None)
+        agent_metrics.record_incident_outcome(
+            "escalated",
+            (datetime.now(timezone.utc) - detected_at).total_seconds(),
+        )
+        decision_log.add(
+            mode="ESCALATE",
+            confidence=None,
+            incident_id=incident_id,
+            reason=f"Log collection failed: {exc}",
+        )
         return {
             "incident_id": incident_id,
             "outcome": "escalated",
@@ -200,6 +213,17 @@ def handle_alert(
                 f"({diagnosis.confidence:.2f} < 0.80): "
                 f"{diagnosis.category or 'unknown category'}"
             ),
+        )
+        agent_metrics.record_decision("ESCALATE", diagnosis.confidence)
+        agent_metrics.record_incident_outcome(
+            "escalated",
+            (datetime.now(timezone.utc) - detected_at).total_seconds(),
+        )
+        decision_log.add(
+            mode="ESCALATE",
+            confidence=diagnosis.confidence,
+            incident_id=incident_id,
+            reason=f"Low root cause confidence: {diagnosis.category}",
         )
         return {
             "incident_id": incident_id,
@@ -236,6 +260,17 @@ def handle_alert(
         decision.reason,
     )
 
+    log_entry = decision_log.add(
+        mode=decision.decision_mode.value,
+        confidence=decision.confidence,
+        incident_id=incident_id,
+        action_type=decision.chosen_action_id,
+        reason=decision.reason,
+    )
+    agent_metrics.record_decision(
+        decision.decision_mode.value, decision.confidence
+    )
+
     if decision.decision_mode == DecisionMode.ESCALATE:
         mttr.record_outcome(incident_id, "escalated")
         notify_escalation(
@@ -243,6 +278,11 @@ def handle_alert(
             component=pod,
             reason=f"Decision engine escalated: {decision.reason}",
         )
+        agent_metrics.record_incident_outcome(
+            "escalated",
+            (datetime.now(timezone.utc) - detected_at).total_seconds(),
+        )
+        decision_log.update_outcome(log_entry.id, "escalated")
         return {
             "incident_id": incident_id,
             "outcome": "escalated",
@@ -309,6 +349,14 @@ def handle_alert(
             )
 
         mttr.record_outcome(incident_id, outcome)
+        agent_metrics.record_incident_outcome(
+            outcome,
+            (datetime.now(timezone.utc) - detected_at).total_seconds(),
+        )
+        agent_metrics.record_remediation_action(
+            decision.chosen_action_id, result.success
+        )
+        decision_log.update_outcome(log_entry.id, outcome)
 
         return {
             "incident_id": incident_id,
@@ -344,6 +392,14 @@ def handle_alert(
 
     if outcome != "pending":
         mttr.record_outcome(incident_id, outcome)
+        agent_metrics.record_incident_outcome(
+            outcome,
+            (datetime.now(timezone.utc) - detected_at).total_seconds(),
+        )
+        agent_metrics.record_remediation_action(
+            decision.chosen_action_id, result.success
+        )
+        decision_log.update_outcome(log_entry.id, outcome)
 
     return {
         "incident_id": incident_id,

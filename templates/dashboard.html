@@ -1,212 +1,3094 @@
 ﻿<!DOCTYPE html>
 <html lang="fr">
 <head>
-<meta charset="UTF-8">
-<title>Agent DevOps Autonome — Tableau de bord</title>
-<style>
-  body { font-family: -apple-system, Segoe UI, sans-serif; background: #0f1115; color: #e6e6e6; margin: 0; padding: 2rem; }
-  h1 { font-size: 1.4rem; margin-bottom: 0.25rem; }
-  .subtitle { color: #9aa0a6; margin-bottom: 2rem; }
-  .cards { display: flex; gap: 1rem; flex-wrap: wrap; margin-bottom: 2rem; }
-  .card { background: #1a1d24; border-radius: 10px; padding: 1rem 1.5rem; min-width: 140px; border: 1px solid #2a2e37; }
-  .card .value { font-size: 1.8rem; font-weight: 700; }
-  .card .label { color: #9aa0a6; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.04em; }
-  .resolved .value { color: #4ade80; }
-  .escalated .value { color: #fbbf24; }
-  .failed .value { color: #f87171; }
-  .pending .value { color: #60a5fa; }
-  section { margin-bottom: 2.5rem; }
-  h2 { font-size: 1.1rem; border-bottom: 1px solid #2a2e37; padding-bottom: 0.5rem; }
-  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; }
-  th, td { text-align: left; padding: 0.5rem 0.75rem; border-bottom: 1px solid #22252c; }
-  th { color: #9aa0a6; font-weight: 500; }
-  .status { padding: 0.15rem 0.5rem; border-radius: 4px; font-size: 0.75rem; }
-  .status-resolved { background: #14331f; color: #4ade80; }
-  .status-escalated { background: #332a12; color: #fbbf24; }
-  .status-failed { background: #331616; color: #f87171; }
-  button { cursor: pointer; border: none; border-radius: 6px; padding: 0.35rem 0.8rem; font-size: 0.8rem; margin-right: 0.4rem; }
-  .approve { background: #14331f; color: #4ade80; }
-  .reject { background: #331616; color: #f87171; }
-  #apiKeyBanner { background: #1a1d24; border: 1px solid #2a2e37; padding: 0.75rem 1rem; border-radius: 8px; margin-bottom: 1.5rem; font-size: 0.85rem; }
-  #apiKeyBanner input { background: #0f1115; border: 1px solid #2a2e37; color: #e6e6e6; padding: 0.3rem 0.5rem; border-radius: 4px; margin-left: 0.5rem; }
-  .empty { color: #6b7280; font-style: italic; padding: 1rem 0; }
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>Agent DevOps Autonome</title>
+
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        :root {
+            --bg: #080b12;
+            --bg-secondary: #0d111a;
+            --panel: #111722;
+            --panel-hover: #151c29;
+            --border: #202938;
+            --border-light: #2a3445;
+
+            --text: #f1f5f9;
+            --muted: #8b98aa;
+
+            --blue: #4f8cff;
+            --blue-light: #72a7ff;
+
+            --green: #32d583;
+            --green-dark: #123a29;
+
+            --yellow: #f5b942;
+            --yellow-dark: #3c2d0e;
+
+            --red: #ff647c;
+            --red-dark: #421923;
+
+            --purple: #9b8cff;
+            --cyan: #35c7e8;
+
+            --shadow:
+                0 10px 30px rgba(0, 0, 0, 0.25);
+
+            --radius: 14px;
+        }
+
+        body {
+            font-family:
+                Inter,
+                ui-sans-serif,
+                system-ui,
+                -apple-system,
+                BlinkMacSystemFont,
+                "Segoe UI",
+                sans-serif;
+
+            background:
+                radial-gradient(
+                    circle at top right,
+                    rgba(79, 140, 255, 0.08),
+                    transparent 30%
+                ),
+                radial-gradient(
+                    circle at top left,
+                    rgba(155, 140, 255, 0.05),
+                    transparent 25%
+                ),
+                var(--bg);
+
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* =========================
+           HEADER
+        ========================== */
+
+        header {
+            position: sticky;
+            top: 0;
+            z-index: 100;
+
+            background: rgba(8, 11, 18, 0.88);
+            backdrop-filter: blur(14px);
+
+            border-bottom: 1px solid var(--border);
+
+            padding: 18px 32px;
+
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            gap: 20px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .brand-icon {
+            width: 44px;
+            height: 44px;
+
+            border-radius: 12px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(79, 140, 255, 0.25),
+                    rgba(155, 140, 255, 0.12)
+                );
+
+            border: 1px solid rgba(79, 140, 255, 0.35);
+
+            font-size: 20px;
+            font-weight: 800;
+            color: var(--blue-light);
+        }
+
+        .brand h1 {
+            font-size: 20px;
+            font-weight: 750;
+            letter-spacing: -0.02em;
+        }
+
+        .brand p {
+            margin-top: 3px;
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .header-right {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+        }
+
+        .connection {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+
+            padding: 8px 13px;
+
+            border: 1px solid var(--border);
+            border-radius: 999px;
+
+            background: var(--panel);
+
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        .connection-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--yellow);
+
+            box-shadow: 0 0 10px rgba(245, 185, 66, 0.5);
+        }
+
+        .connection.online .connection-dot {
+            background: var(--green);
+            box-shadow: 0 0 12px rgba(50, 213, 131, 0.6);
+        }
+
+        .connection.offline .connection-dot {
+            background: var(--red);
+            box-shadow: 0 0 12px rgba(255, 100, 124, 0.6);
+        }
+
+        /* =========================
+           MAIN
+        ========================== */
+
+        main {
+            max-width: 1600px;
+            margin: 0 auto;
+            padding: 30px 32px 60px;
+        }
+
+        /* =========================
+           API CONNECTION
+        ========================== */
+
+        .connection-panel {
+            background:
+                linear-gradient(
+                    135deg,
+                    rgba(17, 23, 34, 0.98),
+                    rgba(13, 17, 26, 0.98)
+                );
+
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+
+            padding: 18px;
+
+            margin-bottom: 28px;
+
+            box-shadow: var(--shadow);
+        }
+
+        .connection-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .key-input {
+            flex: 1;
+
+            height: 44px;
+
+            background: #090d14;
+            border: 1px solid var(--border-light);
+
+            color: var(--text);
+
+            border-radius: 9px;
+
+            padding: 0 14px;
+
+            outline: none;
+
+            transition: 0.2s;
+        }
+
+        .key-input:focus {
+            border-color: var(--blue);
+            box-shadow: 0 0 0 3px rgba(79, 140, 255, 0.1);
+        }
+
+        button {
+            border: none;
+            cursor: pointer;
+
+            font-family: inherit;
+        }
+
+        .primary-btn {
+            height: 44px;
+
+            padding: 0 20px;
+
+            border-radius: 9px;
+
+            color: white;
+
+            background:
+                linear-gradient(
+                    135deg,
+                    #3979ed,
+                    #5b8ff7
+                );
+
+            font-weight: 650;
+
+            box-shadow:
+                0 8px 20px rgba(79, 140, 255, 0.2);
+
+            transition: 0.2s;
+        }
+
+        .primary-btn:hover {
+            transform: translateY(-1px);
+            box-shadow:
+                0 12px 24px rgba(79, 140, 255, 0.28);
+        }
+
+        .primary-btn:active {
+            transform: translateY(0);
+        }
+
+        .connection-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            margin-top: 12px;
+
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .connection-info strong {
+            color: var(--text);
+        }
+
+        /* =========================
+           SECTION HEADER
+        ========================== */
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 750;
+            letter-spacing: -0.01em;
+        }
+
+        .section-title span {
+            color: var(--blue-light);
+        }
+
+        .section-meta {
+            font-size: 12px;
+            color: var(--muted);
+        }
+
+        /* =========================
+           METRIC CARDS
+        ========================== */
+
+        .metrics-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(4, minmax(0, 1fr));
+
+            gap: 14px;
+        }
+
+        .metric-card {
+            position: relative;
+
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(17, 23, 34, 0.98),
+                    rgba(13, 17, 26, 0.98)
+                );
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            padding: 20px;
+
+            min-height: 150px;
+
+            overflow: hidden;
+
+            box-shadow: var(--shadow);
+
+            transition:
+                border-color 0.2s,
+                transform 0.2s,
+                background 0.2s;
+        }
+
+        .metric-card:hover {
+            transform: translateY(-2px);
+            border-color: var(--border-light);
+            background: var(--panel-hover);
+        }
+
+        .metric-card::after {
+            content: "";
+
+            position: absolute;
+
+            right: -35px;
+            bottom: -55px;
+
+            width: 130px;
+            height: 130px;
+
+            border-radius: 50%;
+
+            background: rgba(79, 140, 255, 0.05);
+        }
+
+        .metric-top {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .metric-name {
+            color: var(--muted);
+
+            font-size: 11px;
+
+            font-weight: 650;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.07em;
+        }
+
+        .metric-icon {
+            width: 32px;
+            height: 32px;
+
+            display: flex;
+            align-items: center;
+            justify-content: center;
+
+            border-radius: 9px;
+
+            background: rgba(79, 140, 255, 0.1);
+
+            color: var(--blue-light);
+
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .metric-value {
+            margin-top: 20px;
+
+            font-size: 30px;
+
+            line-height: 1;
+
+            font-weight: 780;
+
+            letter-spacing: -0.04em;
+        }
+
+        .metric-unit {
+            margin-top: 9px;
+
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+        .metric-source {
+            margin-top: 12px;
+
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+
+            font-size: 10px;
+
+            color: #64748b;
+        }
+
+        .metric-source::before {
+            content: "";
+
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+            background: var(--green);
+        }
+
+        /* =========================
+           STATUS CARDS
+        ========================== */
+
+        .status-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(5, minmax(0, 1fr));
+
+            gap: 14px;
+        }
+
+        .status-card {
+            background: var(--panel);
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            padding: 19px;
+
+            min-height: 125px;
+        }
+
+        .status-label {
+            font-size: 11px;
+
+            color: var(--muted);
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.05em;
+        }
+
+        .status-value {
+            margin-top: 17px;
+
+            font-size: 30px;
+
+            font-weight: 780;
+        }
+
+        .blue {
+            color: var(--blue-light);
+        }
+
+        .green {
+            color: var(--green);
+        }
+
+        .yellow {
+            color: var(--yellow);
+        }
+
+        .red {
+            color: var(--red);
+        }
+
+        /* =========================
+           AI CARDS
+        ========================== */
+
+        .ai-grid {
+            display: grid;
+
+            grid-template-columns:
+                repeat(3, minmax(0, 1fr));
+
+            gap: 14px;
+
+            margin-bottom: 18px;
+        }
+
+        .ai-card {
+            background:
+                linear-gradient(
+                    145deg,
+                    rgba(17, 23, 34, 0.98),
+                    rgba(13, 17, 26, 0.98)
+                );
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            padding: 20px;
+        }
+
+        .ai-card-label {
+            color: var(--muted);
+
+            font-size: 11px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.06em;
+        }
+
+        .ai-card-value {
+            margin-top: 13px;
+
+            font-size: 29px;
+
+            font-weight: 780;
+        }
+
+        .ai-card-subtitle {
+            margin-top: 8px;
+
+            color: var(--muted);
+
+            font-size: 11px;
+        }
+
+        /* =========================
+           TABLE
+        ========================== */
+
+        .table-container {
+            overflow-x: auto;
+
+            background: var(--panel);
+
+            border: 1px solid var(--border);
+
+            border-radius: var(--radius);
+
+            box-shadow: var(--shadow);
+        }
+
+        table {
+            width: 100%;
+
+            border-collapse: collapse;
+
+            min-width: 800px;
+        }
+
+        th {
+            padding: 14px 16px;
+
+            text-align: left;
+
+            font-size: 10px;
+
+            text-transform: uppercase;
+
+            letter-spacing: 0.06em;
+
+            color: #68768a;
+
+            background: #0e141e;
+
+            border-bottom: 1px solid var(--border);
+        }
+
+        td {
+            padding: 14px 16px;
+
+            font-size: 12px;
+
+            color: #cbd5e1;
+
+            border-bottom: 1px solid rgba(32, 41, 56, 0.65);
+        }
+
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: rgba(79, 140, 255, 0.035);
+        }
+
+        .status-badge {
+            display: inline-flex;
+
+            align-items: center;
+
+            gap: 6px;
+
+            padding: 5px 9px;
+
+            border-radius: 999px;
+
+            font-size: 10px;
+
+            font-weight: 650;
+
+            text-transform: uppercase;
+        }
+
+        .status-badge::before {
+            content: "";
+
+            width: 5px;
+            height: 5px;
+
+            border-radius: 50%;
+
+            background: currentColor;
+        }
+
+        .status-resolved {
+            color: var(--green);
+            background: var(--green-dark);
+        }
+
+        .status-escalated {
+            color: var(--yellow);
+            background: var(--yellow-dark);
+        }
+
+        .status-failed {
+            color: var(--red);
+            background: var(--red-dark);
+        }
+
+        .status-pending {
+            color: var(--blue-light);
+            background: rgba(79, 140, 255, 0.1);
+        }
+
+        .status-running {
+            color: var(--cyan);
+            background: rgba(53, 199, 232, 0.1);
+        }
+
+        /* =========================
+           CONFIDENCE
+        ========================== */
+
+        .confidence {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .confidence-bar {
+            width: 70px;
+            height: 5px;
+
+            background: #202938;
+
+            border-radius: 999px;
+
+            overflow: hidden;
+        }
+
+        .confidence-fill {
+            height: 100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    var(--blue),
+                    var(--purple)
+                );
+
+            border-radius: inherit;
+        }
+
+        /* =========================
+           APPROVALS
+        ========================== */
+
+        .approval-list {
+            display: grid;
+
+            grid-template-columns:
+                repeat(auto-fit, minmax(300px, 1fr));
+
+            gap: 12px;
+        }
+
+        .approval-card {
+            background: var(--panel);
+
+            border: 1px solid var(--border);
+
+            border-radius: 12px;
+
+            padding: 17px;
+        }
+
+        .approval-top {
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            margin-bottom: 10px;
+        }
+
+        .approval-action {
+            font-weight: 700;
+
+            font-size: 13px;
+        }
+
+        .approval-meta {
+            color: var(--muted);
+
+            font-size: 11px;
+
+            line-height: 1.7;
+        }
+
+        .approval-reason {
+            margin-top: 10px;
+
+            padding: 10px;
+
+            border-radius: 8px;
+
+            background: #0b1018;
+
+            color: #aeb9c8;
+
+            font-size: 11px;
+
+            line-height: 1.5;
+        }
+
+        .approval-buttons {
+            display: flex;
+
+            gap: 8px;
+
+            margin-top: 13px;
+        }
+
+        .approve-btn,
+        .reject-btn {
+            padding: 8px 13px;
+
+            border-radius: 8px;
+
+            font-size: 11px;
+
+            font-weight: 650;
+        }
+
+        .approve-btn {
+            background: var(--green-dark);
+            color: var(--green);
+            border: 1px solid rgba(50, 213, 131, 0.18);
+        }
+
+        .reject-btn {
+            background: var(--red-dark);
+            color: var(--red);
+            border: 1px solid rgba(255, 100, 124, 0.18);
+        }
+
+        .approve-btn:hover,
+        .reject-btn:hover {
+            filter: brightness(1.25);
+        }
+
+        /* =========================
+           EMPTY
+        ========================== */
+
+        .empty {
+            text-align: center;
+
+            padding: 35px !important;
+
+            color: #64748b;
+
+            font-size: 12px;
+        }
+
+        /* =========================
+           FILTER
+        ========================== */
+
+        .toolbar {
+            display: flex;
+
+            justify-content: space-between;
+
+            align-items: center;
+
+            gap: 12px;
+
+            margin-bottom: 12px;
+        }
+
+        .filter-input {
+            width: 280px;
+
+            height: 38px;
+
+            background: #0d131d;
+
+            border: 1px solid var(--border);
+
+            border-radius: 8px;
+
+            color: var(--text);
+
+            padding: 0 12px;
+
+            outline: none;
+
+            font-size: 11px;
+        }
+
+        .filter-input:focus {
+            border-color: var(--blue);
+        }
+
+        /* =========================
+           TOAST
+        ========================== */
+
+        #toast {
+            position: fixed;
+
+            right: 24px;
+            bottom: 24px;
+
+            z-index: 1000;
+
+            padding: 13px 16px;
+
+            border-radius: 10px;
+
+            background: #151c29;
+
+            border: 1px solid var(--border-light);
+
+            box-shadow: var(--shadow);
+
+            font-size: 12px;
+
+            color: var(--text);
+
+            opacity: 0;
+
+            transform: translateY(10px);
+
+            pointer-events: none;
+
+            transition: 0.25s;
+        }
+
+        #toast.show {
+            opacity: 1;
+
+            transform: translateY(0);
+        }
+
+        #toast.success {
+            border-color: rgba(50, 213, 131, 0.35);
+        }
+
+        #toast.error {
+            border-color: rgba(255, 100, 124, 0.35);
+        }
+
+        /* =========================
+           LOADING
+        ========================== */
+
+        .loading {
+            opacity: 0.55;
+        }
+
+        /* =========================
+           RESPONSIVE
+        ========================== */
+
+        @media (max-width: 1100px) {
+            .metrics-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+
+            .status-grid {
+                grid-template-columns:
+                    repeat(3, minmax(0, 1fr));
+            }
+
+            .ai-grid {
+                grid-template-columns:
+                    repeat(2, minmax(0, 1fr));
+            }
+        }
+
+        @media (max-width: 750px) {
+            header {
+                padding: 15px 18px;
+            }
+
+            .header-right {
+                display: none;
+            }
+
+            main {
+                padding: 22px 16px 45px;
+            }
+
+            .connection-row {
+                flex-direction: column;
+            }
+
+            .key-input,
+            .primary-btn {
+                width: 100%;
+            }
+
+            .metrics-grid,
+            .status-grid,
+            .ai-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .connection-info {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 6px;
+            }
+
+            .toolbar {
+                flex-direction: column;
+                align-items: stretch;
+            }
+
+            .filter-input {
+                width: 100%;
+            }
+        }
+    </style>
 </head>
 
 <body>
 
-<h1>Agent DevOps Autonome</h1>
-<p class="subtitle">Tableau de bord de supervision</p>
+<header>
 
-<div id="apiKeyBanner">
-  Clé API :
-  <input type="password" id="apiKeyInput" placeholder="X-API-Key">
-  <button onclick="setApiKey()">Charger</button>
-</div>
+    <div class="brand">
 
-<section id="summarySection" style="display:none">
-  <div class="cards">
-    <div class="card">
-      <div class="value" id="countDetected">–</div>
-      <div class="label">Incidents détectés</div>
+        <div class="brand-icon">
+            AI
+        </div>
+
+        <div>
+            <h1>Agent DevOps Autonome</h1>
+
+            <p>
+                Monitoring Prometheus · Détection IA · Self-Healing
+            </p>
+        </div>
+
     </div>
 
-    <div class="card resolved">
-      <div class="value" id="countResolved">–</div>
-      <div class="label">Résolus automatiquement</div>
+    <div class="header-right">
+
+        <div id="connectionStatus" class="connection">
+
+            <span class="connection-dot"></span>
+
+            <span id="connectionText">
+                Non connecté
+            </span>
+
+        </div>
+
     </div>
 
-    <div class="card escalated">
-      <div class="value" id="countEscalated">–</div>
-      <div class="label">Escaladés</div>
+</header>
+
+
+<main>
+
+    <!-- =========================
+         API CONNECTION
+    ========================== -->
+
+    <div class="connection-panel">
+
+        <div class="connection-row">
+
+            <input
+                id="apiKeyInput"
+                class="key-input"
+                type="password"
+                placeholder="Clé API : ma-cle-secrete-locale"
+                autocomplete="off"
+            >
+
+            <button
+                class="primary-btn"
+                onclick="connectDashboard()"
+            >
+                Connecter
+            </button>
+
+        </div>
+
+        <div class="connection-info">
+
+            <span>
+                Source infrastructure :
+                <strong>Prometheus</strong>
+            </span>
+
+            <span>
+                Actualisation :
+                <strong>30 secondes</strong>
+                · prochaine :
+                <strong id="countdown">—</strong>
+            </span>
+
+            <span>
+                Dernière mise à jour :
+                <strong id="lastUpdate">—</strong>
+            </span>
+
+        </div>
+
     </div>
 
-    <div class="card pending">
-      <div class="value" id="countPending">–</div>
-      <div class="label">En attente d'approbation</div>
-    </div>
 
-    <div class="card failed">
-      <div class="value" id="countFailed">–</div>
-      <div class="label">Échecs</div>
-    </div>
-  </div>
-</section>
+    <!-- =========================
+         INFRASTRUCTURE
+    ========================== -->
 
-<section id="approvalsSection" style="display:none">
-  <h2>Approbations en attente</h2>
-  <div id="approvalsList"></div>
-</section>
+    <section class="section">
 
-<section id="historySection" style="display:none">
-  <h2>Historique des interventions</h2>
+        <div class="section-header">
 
-  <table>
-    <thead>
-      <tr>
-        <th>Horodatage</th>
-        <th>Action</th>
-        <th>Statut</th>
-        <th>Message</th>
-      </tr>
-    </thead>
+            <div class="section-title">
+                Infrastructure
+                <span>— Prometheus</span>
+            </div>
 
-    <tbody id="historyBody"></tbody>
-  </table>
-</section>
+            <div class="section-meta">
+                Données temps réel
+            </div>
+
+        </div>
+
+
+        <div class="metrics-grid">
+
+            <div class="metric-card">
+
+                <div class="metric-top">
+
+                    <div class="metric-name">
+                        CPU
+                    </div>
+
+                    <div class="metric-icon">
+                        CPU
+                    </div>
+
+                </div>
+
+                <div
+                    id="infraCpu"
+                    class="metric-value blue"
+                >
+                    —
+                </div>
+
+                <div class="metric-unit">
+                    utilisation processeur
+                </div>
+
+                <div class="metric-source">
+                    Prometheus
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-top">
+
+                    <div class="metric-name">
+                        RAM
+                    </div>
+
+                    <div class="metric-icon">
+                        RAM
+                    </div>
+
+                </div>
+
+                <div
+                    id="infraMem"
+                    class="metric-value"
+                >
+                    —
+                </div>
+
+                <div class="metric-unit">
+                    mémoire utilisée
+                </div>
+
+                <div class="metric-source">
+                    Prometheus
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-top">
+
+                    <div class="metric-name">
+                        Network RX
+                    </div>
+
+                    <div class="metric-icon">
+                        RX
+                    </div>
+
+                </div>
+
+                <div
+                    id="infraRx"
+                    class="metric-value"
+                >
+                    —
+                </div>
+
+                <div class="metric-unit">
+                    réception réseau
+                </div>
+
+                <div class="metric-source">
+                    Prometheus
+                </div>
+
+            </div>
+
+
+            <div class="metric-card">
+
+                <div class="metric-top">
+
+                    <div class="metric-name">
+                        Network TX
+                    </div>
+
+                    <div class="metric-icon">
+                        TX
+                    </div>
+
+                </div>
+
+                <div
+                    id="infraTx"
+                    class="metric-value"
+                >
+                    —
+                </div>
+
+                <div class="metric-unit">
+                    transmission réseau
+                </div>
+
+                <div class="metric-source">
+                    Prometheus
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         INCIDENT STATUS
+    ========================== -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <div class="section-title">
+                État des incidents
+            </div>
+
+            <div class="section-meta">
+                Pipeline IA
+            </div>
+
+        </div>
+
+
+        <div class="status-grid">
+
+            <div class="status-card">
+
+                <div class="status-label">
+                    Détectés
+                </div>
+
+                <div
+                    id="countDetected"
+                    class="status-value blue"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="status-card">
+
+                <div class="status-label">
+                    Résolus automatiquement
+                </div>
+
+                <div
+                    id="countResolved"
+                    class="status-value green"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="status-card">
+
+                <div class="status-label">
+                    Escaladés
+                </div>
+
+                <div
+                    id="countEscalated"
+                    class="status-value yellow"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="status-card">
+
+                <div class="status-label">
+                    Échecs
+                </div>
+
+                <div
+                    id="countFailed"
+                    class="status-value red"
+                >
+                    —
+                </div>
+
+            </div>
+
+
+            <div class="status-card">
+
+                <div class="status-label">
+                    Approbations en attente
+                </div>
+
+                <div
+                    id="countPending"
+                    class="status-value blue"
+                >
+                    —
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         AI / SELF HEALING
+    ========================== -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <div class="section-title">
+                IA <span>&</span> Self-Healing
+            </div>
+
+            <div class="section-meta">
+                Décisions et remédiation
+            </div>
+
+        </div>
+
+
+        <div class="ai-grid">
+
+            <div class="ai-card">
+
+                <div class="ai-card-label">
+                    Taux d'auto-résolution
+                </div>
+
+                <div
+                    id="selfHealingRatio"
+                    class="ai-card-value green"
+                >
+                    —
+                </div>
+
+                <div class="ai-card-subtitle">
+                    incidents résolus automatiquement
+                </div>
+
+            </div>
+
+
+            <div class="ai-card">
+
+                <div class="ai-card-label">
+                    MTTR moyen
+                </div>
+
+                <div
+                    id="avgMttr"
+                    class="ai-card-value"
+                >
+                    —
+                </div>
+
+                <div class="ai-card-subtitle">
+                    temps moyen de résolution
+                </div>
+
+            </div>
+
+
+            <div class="ai-card">
+
+                <div class="ai-card-label">
+                    Incidents suivis
+                </div>
+
+                <div
+                    id="totalIncidentsTracked"
+                    class="ai-card-value"
+                >
+                    —
+                </div>
+
+                <div class="ai-card-subtitle">
+                    incidents enregistrés par l'agent
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <!-- DECISIONS -->
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Horodatage</th>
+                        <th>Mode</th>
+                        <th>Confiance</th>
+                        <th>Action</th>
+                        <th>Résultat</th>
+                        <th>Raison</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="decisionsBody">
+
+                    <tr>
+                        <td colspan="6" class="empty">
+                            Connectez le dashboard pour charger les décisions.
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         APPROVALS
+    ========================== -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <div class="section-title">
+                Approbations humaines
+            </div>
+
+            <div class="section-meta">
+                Human-in-the-loop
+            </div>
+
+        </div>
+
+
+        <div
+            id="approvalsList"
+            class="approval-list"
+        >
+
+            <div class="approval-card">
+
+                <div class="approval-meta">
+                    Connectez le dashboard pour charger les approbations.
+                </div>
+
+            </div>
+
+        </div>
+
+    </section>
+
+
+    <!-- =========================
+         HISTORY
+    ========================== -->
+
+    <section class="section">
+
+        <div class="section-header">
+
+            <div class="section-title">
+                Historique des interventions
+            </div>
+
+            <div class="section-meta">
+                Audit / Remédiation
+            </div>
+
+        </div>
+
+
+        <div class="toolbar">
+
+            <div class="section-meta">
+                Dernières interventions de l'agent
+            </div>
+
+            <input
+                id="historyFilter"
+                class="filter-input"
+                type="text"
+                placeholder="Rechercher une action..."
+                oninput="filterHistory()"
+            >
+
+        </div>
+
+
+        <div class="table-container">
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>Horodatage</th>
+                        <th>Action</th>
+                        <th>Statut</th>
+                        <th>Message</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="historyBody">
+
+                    <tr>
+                        <td colspan="4" class="empty">
+                            Aucune donnée disponible.
+                        </td>
+                    </tr>
+
+                </tbody>
+
+            </table>
+
+        </div>
+
+    </section>
+
+</main>
+
+
+<div id="toast"></div>
+
 
 <script>
-let apiKey = null;
 
-function setApiKey() {
-  apiKey = document.getElementById('apiKeyInput').value;
+    /* =========================================================
+       CONFIGURATION
+    ========================================================== */
 
-  if (!apiKey) return;
+    const REFRESH_INTERVAL = 30;
 
-  document.getElementById('summarySection').style.display = 'block';
-  document.getElementById('approvalsSection').style.display = 'block';
-  document.getElementById('historySection').style.display = 'block';
+    let apiKey = null;
 
-  refresh();
+    let countdownValue = REFRESH_INTERVAL;
 
-  setInterval(refresh, 15000);
-}
+    let refreshTimer = null;
 
-async function apiGet(path) {
-  const res = await fetch(path, {
-    headers: {
-      'X-API-Key': apiKey
+    let countdownTimer = null;
+
+    let historyData = [];
+
+
+    /* =========================================================
+       INITIALISATION
+    ========================================================== */
+
+    document.addEventListener("DOMContentLoaded", () => {
+
+        const savedKey =
+            localStorage.getItem("monitoring_api_key");
+
+        if (savedKey) {
+
+            document.getElementById("apiKeyInput").value =
+                savedKey;
+
+            connectDashboard(false);
+        }
+
+    });
+
+
+    /* =========================================================
+       CONNECT DASHBOARD
+    ========================================================== */
+
+    async function connectDashboard(showMessage = true) {
+
+        const input =
+            document.getElementById("apiKeyInput");
+
+        const key =
+            input.value.trim();
+
+        if (!key) {
+
+            showToast(
+                "Veuillez saisir la clé API.",
+                "error"
+            );
+
+            return;
+        }
+
+        apiKey = key;
+
+        localStorage.setItem(
+            "monitoring_api_key",
+            apiKey
+        );
+
+        updateConnectionStatus(
+            "connecting"
+        );
+
+        try {
+
+            await refresh();
+
+            startAutoRefresh();
+
+            if (showMessage) {
+
+                showToast(
+                    "Dashboard connecté à Prometheus.",
+                    "success"
+                );
+
+            }
+
+        } catch (error) {
+
+            console.error(error);
+
+            updateConnectionStatus(
+                "offline"
+            );
+
+            showToast(
+                "Impossible de contacter le backend.",
+                "error"
+            );
+
+        }
+
     }
-  });
 
-  if (!res.ok) {
-    throw new Error('API error ' + res.status);
-  }
 
-  return res.json();
-}
+    /* =========================================================
+       API GET
+    ========================================================== */
 
-async function apiPost(path) {
-  const res = await fetch(path, {
-    method: 'POST',
-    headers: {
-      'X-API-Key': apiKey
+    async function apiGet(path) {
+
+        if (!apiKey) {
+
+            throw new Error(
+                "API key missing"
+            );
+
+        }
+
+        const response =
+            await fetch(path, {
+
+                method: "GET",
+
+                headers: {
+                    "X-API-Key": apiKey,
+                    "Accept": "application/json"
+                },
+
+                cache: "no-store"
+
+            });
+
+
+        if (response.status === 401) {
+
+            updateConnectionStatus(
+                "offline"
+            );
+
+            throw new Error(
+                "API key incorrecte."
+            );
+
+        }
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "API error " +
+                response.status
+            );
+
+        }
+
+
+        return response.json();
+
     }
-  });
 
-  return res.json();
-}
 
-async function refresh() {
-  try {
-    const summary = await apiGet('/api/dashboard/summary');
+    /* =========================================================
+       API POST
+    ========================================================== */
 
-    document.getElementById('countDetected').textContent = summary.detected;
-    document.getElementById('countResolved').textContent = summary.resolved;
-    document.getElementById('countEscalated').textContent = summary.escalated;
-    document.getElementById('countPending').textContent = summary.pending_approval;
-    document.getElementById('countFailed').textContent = summary.failed;
+    async function apiPost(path, body = null) {
 
-    const pending = await apiGet('/api/approvals/pending');
-    const list = document.getElementById('approvalsList');
+        const options = {
 
-    if (pending.approvals.length === 0) {
-      list.innerHTML =
-        '<p class="empty">Aucune action en attente d\'approbation.</p>';
-    } else {
-      list.innerHTML = pending.approvals.map(a => `
-        <div class="card" style="margin-bottom:0.75rem;">
-          <strong>${a.action_id}</strong>
-          — ${a.executor} (${a.severity})<br>
+            method: "POST",
 
-          <span style="color:#9aa0a6">${a.reason}</span><br><br>
+            headers: {
 
-          <button
-            class="approve"
-            onclick="decide('${a.action_id}', 'approve')">
-            Approuver
-          </button>
+                "X-API-Key": apiKey,
 
-          <button
-            class="reject"
-            onclick="decide('${a.action_id}', 'reject')">
-            Rejeter
-          </button>
-        </div>
-      `).join('');
+                "Content-Type":
+                    "application/json",
+
+                "Accept":
+                    "application/json"
+
+            }
+
+        };
+
+
+        if (body !== null) {
+
+            options.body =
+                JSON.stringify(body);
+
+        }
+
+
+        const response =
+            await fetch(path, options);
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                "API error " +
+                response.status
+            );
+
+        }
+
+
+        return response.json();
+
     }
 
-    const history =
-      await apiGet('/api/dashboard/history?limit=50');
 
-    const body = document.getElementById('historyBody');
+    /* =========================================================
+       REFRESH
+    ========================================================== */
 
-    body.innerHTML = history.history.map(h => `
-      <tr>
-        <td>${new Date(h.timestamp).toLocaleString('fr-FR')}</td>
-        <td>${h.action_id}</td>
-        <td>
-          <span class="status status-${h.status}">
-            ${h.status}
-          </span>
-        </td>
-        <td>${h.message}</td>
-      </tr>
-    `).join('') ||
-      '<tr><td colspan="4" class="empty">Aucune intervention journalisée.</td></tr>';
+    async function refresh() {
 
-  } catch (e) {
-    console.error(e);
-  }
-}
+        if (!apiKey) {
+            return;
+        }
 
-async function decide(actionId, decision) {
-  await apiPost(
-    `/api/approvals/${actionId}/${decision}`
-  );
 
-  refresh();
-}
+        document.body.classList.add(
+            "loading"
+        );
+
+
+        try {
+
+            /*
+             * Infrastructure
+             *
+             * Prometheus
+             */
+
+            const infra =
+                await apiGet(
+                    "/api/dashboard/infra"
+                );
+
+
+            updateInfrastructure(
+                infra
+            );
+
+
+            /*
+             * Decisions IA
+             */
+
+            const decisions =
+                await apiGet(
+                    "/api/dashboard/decisions?limit=50"
+                );
+
+
+            updateDecisions(
+                decisions
+            );
+
+
+            /*
+             * Summary
+             */
+
+            const summary =
+                await apiGet(
+                    "/api/dashboard/summary"
+                );
+
+
+            updateSummary(
+                summary
+            );
+
+
+            /*
+             * Approvals
+             */
+
+            try {
+
+                const pending =
+                    await apiGet(
+                        "/api/approvals/pending"
+                    );
+
+                updateApprovals(
+                    pending
+                );
+
+            } catch (error) {
+
+                console.warn(
+                    "Approvals:",
+                    error
+                );
+
+            }
+
+
+            /*
+             * History
+             */
+
+            const history =
+                await apiGet(
+                    "/api/dashboard/history?limit=50"
+                );
+
+
+            updateHistory(
+                history
+            );
+
+
+            /*
+             * Connection OK
+             */
+
+            updateConnectionStatus(
+                "online"
+            );
+
+
+            const now =
+                new Date();
+
+
+            document.getElementById(
+                "lastUpdate"
+            ).textContent =
+                now.toLocaleTimeString(
+                    "fr-FR"
+                );
+
+
+            countdownValue =
+                REFRESH_INTERVAL;
+
+
+        } catch (error) {
+
+            console.error(
+                "Dashboard refresh:",
+                error
+            );
+
+
+            updateConnectionStatus(
+                "offline"
+            );
+
+
+            showToast(
+                error.message ||
+                "Erreur de connexion.",
+                "error"
+            );
+
+        } finally {
+
+            document.body.classList.remove(
+                "loading"
+            );
+
+        }
+
+    }
+
+
+    /* =========================================================
+       INFRASTRUCTURE
+    ========================================================== */
+
+    function updateInfrastructure(
+        infra
+    ) {
+
+        const cpu =
+            Number(
+                infra.cpu_percent
+            );
+
+        const memory =
+            Number(
+                infra.memory_percent
+            );
+
+
+        setText(
+            "infraCpu",
+            isFinite(cpu)
+                ? cpu.toFixed(1) + "%"
+                : "—"
+        );
+
+
+        setText(
+            "infraMem",
+            isFinite(memory)
+                ? memory.toFixed(1) + "%"
+                : "—"
+        );
+
+
+        setText(
+            "infraRx",
+            formatBytesPerSecond(
+                infra.network_receive
+            )
+        );
+
+
+        setText(
+            "infraTx",
+            formatBytesPerSecond(
+                infra.network_transmit
+            )
+        );
+
+    }
+
+
+    /* =========================================================
+       SUMMARY
+    ========================================================== */
+
+    function updateSummary(
+        summary
+    ) {
+
+        setText(
+            "countDetected",
+            summary.detected ?? 0
+        );
+
+        setText(
+            "countResolved",
+            summary.resolved ?? 0
+        );
+
+        setText(
+            "countEscalated",
+            summary.escalated ?? 0
+        );
+
+        setText(
+            "countFailed",
+            summary.failed ?? 0
+        );
+
+        setText(
+            "countPending",
+            summary.pending_approval ?? 0
+        );
+
+    }
+
+
+    /* =========================================================
+       AI DECISIONS
+    ========================================================== */
+
+    function updateDecisions(
+        data
+    ) {
+
+        const ratio =
+            Number(
+                data.self_healing_ratio
+            ) || 0;
+
+
+        setText(
+            "selfHealingRatio",
+            (ratio * 100).toFixed(0) + "%"
+        );
+
+
+        const mttr =
+            Number(
+                data.avg_mttr_seconds
+            ) || 0;
+
+
+        setText(
+            "avgMttr",
+            mttr.toFixed(1) + " s"
+        );
+
+
+        setText(
+            "totalIncidentsTracked",
+            data.total_incidents ?? 0
+        );
+
+
+        const decisions =
+            Array.isArray(data.recent)
+                ? data.recent
+                : [];
+
+
+        const body =
+            document.getElementById(
+                "decisionsBody"
+            );
+
+
+        if (
+            decisions.length === 0
+        ) {
+
+            body.innerHTML = `
+                <tr>
+                    <td colspan="6" class="empty">
+                        Aucune décision IA journalisée.
+                    </td>
+                </tr>
+            `;
+
+            return;
+
+        }
+
+
+        body.innerHTML = "";
+
+
+        decisions.forEach(
+            decision => {
+
+                const tr =
+                    document.createElement(
+                        "tr"
+                    );
+
+
+                addCell(
+                    tr,
+                    formatDate(
+                        decision.timestamp
+                    )
+                );
+
+
+                addCell(
+                    tr,
+                    decision.mode ||
+                    "—"
+                );
+
+
+                const confidenceCell =
+                    document.createElement(
+                        "td"
+                    );
+
+
+                const confidence =
+                    Number(
+                        decision.confidence
+                    );
+
+
+                if (
+                    isFinite(confidence)
+                ) {
+
+                    const percent =
+                        confidence <= 1
+                            ? confidence * 100
+                            : confidence;
+
+
+                    confidenceCell.innerHTML = `
+                        <div class="confidence">
+                            <span>
+                                ${percent.toFixed(0)}%
+                            </span>
+
+                            <div class="confidence-bar">
+                                <div
+                                    class="confidence-fill"
+                                    style="width:${Math.min(
+                                        100,
+                                        Math.max(
+                                            0,
+                                            percent
+                                        )
+                                    )}%"
+                                ></div>
+                            </div>
+                        </div>
+                    `;
+
+                } else {
+
+                    confidenceCell.textContent =
+                        "—";
+
+                }
+
+
+                tr.appendChild(
+                    confidenceCell
+                );
+
+
+                addCell(
+                    tr,
+                    decision.action_type ||
+                    "—"
+                );
+
+
+                const statusCell =
+                    document.createElement(
+                        "td"
+                    );
+
+
+                const outcome =
+                    normalizeStatus(
+                        decision.outcome ||
+                        "pending"
+                    );
+
+
+                statusCell.innerHTML = `
+                    <span class="status-badge status-${outcome}">
+                        ${escapeHtml(outcome)}
+                    </span>
+                `;
+
+
+                tr.appendChild(
+                    statusCell
+                );
+
+
+                addCell(
+                    tr,
+                    decision.reason ||
+                    "—"
+                );
+
+
+                body.appendChild(
+                    tr
+                );
+
+            }
+        );
+
+    }
+
+
+    /* =========================================================
+       APPROVALS
+    ========================================================== */
+
+    function updateApprovals(
+        data
+    ) {
+
+        const container =
+            document.getElementById(
+                "approvalsList"
+            );
+
+
+        let approvals = [];
+
+
+        if (
+            Array.isArray(data)
+        ) {
+
+            approvals = data;
+
+        } else if (
+            Array.isArray(data.approvals)
+        ) {
+
+            approvals =
+                data.approvals;
+
+        }
+
+
+        if (
+            approvals.length === 0
+        ) {
+
+            container.innerHTML = `
+                <div class="approval-card">
+
+                    <div class="approval-meta">
+                        Aucune action en attente d'approbation.
+                    </div>
+
+                </div>
+            `;
+
+            return;
+
+        }
+
+
+        container.innerHTML = "";
+
+
+        approvals.forEach(
+            approval => {
+
+                const card =
+                    document.createElement(
+                        "div"
+                    );
+
+                card.className =
+                    "approval-card";
+
+
+                const actionId =
+                    approval.action_id ??
+                    approval.id ??
+                    "";
+
+
+                const executor =
+                    approval.executor ??
+                    approval.requested_by ??
+                    "agent";
+
+
+                const severity =
+                    approval.severity ??
+                    "unknown";
+
+
+                const reason =
+                    approval.reason ??
+                    approval.message ??
+                    "Action nécessitant une approbation.";
+
+
+                card.innerHTML = `
+
+                    <div class="approval-top">
+
+                        <div class="approval-action">
+                            ${escapeHtml(
+                                actionId
+                            )}
+                        </div>
+
+                        <span class="status-badge status-pending">
+                            pending
+                        </span>
+
+                    </div>
+
+
+                    <div class="approval-meta">
+
+                        Executor :
+                        ${escapeHtml(executor)}
+
+                        <br>
+
+                        Sévérité :
+                        ${escapeHtml(severity)}
+
+                    </div>
+
+
+                    <div class="approval-reason">
+
+                        ${escapeHtml(reason)}
+
+                    </div>
+
+
+                    <div class="approval-buttons">
+
+                        <button
+                            class="approve-btn"
+                            onclick="decideApproval(
+                                '${escapeJs(actionId)}',
+                                'approve'
+                            )"
+                        >
+                            Approuver
+                        </button>
+
+
+                        <button
+                            class="reject-btn"
+                            onclick="decideApproval(
+                                '${escapeJs(actionId)}',
+                                'reject'
+                            )"
+                        >
+                            Rejeter
+                        </button>
+
+                    </div>
+
+                `;
+
+
+                container.appendChild(
+                    card
+                );
+
+            }
+        );
+
+    }
+
+
+    /* =========================================================
+       APPROVAL DECISION
+    ========================================================== */
+
+    async function decideApproval(
+        actionId,
+        decision
+    ) {
+
+        if (!actionId) {
+
+            showToast(
+                "Action invalide.",
+                "error"
+            );
+
+            return;
+
+        }
+
+
+        try {
+
+            /*
+             * Endpoint utilisé actuellement
+             * par le dashboard.
+             */
+
+            const result =
+                await apiPost(
+                    `/api/approvals/${encodeURIComponent(
+                        actionId
+                    )}/${decision}`
+                );
+
+
+            console.log(
+                "Approval result:",
+                result
+            );
+
+
+            showToast(
+                decision === "approve"
+                    ? "Action approuvée."
+                    : "Action rejetée.",
+                "success"
+            );
+
+
+            await refresh();
+
+
+        } catch (error) {
+
+            console.error(
+                error
+            );
+
+
+            showToast(
+                "Impossible de traiter l'approbation.",
+                "error"
+            );
+
+        }
+
+    }
+
+
+    /* =========================================================
+       HISTORY
+    ========================================================== */
+
+    function updateHistory(
+        data
+    ) {
+
+        historyData =
+            Array.isArray(
+                data.history
+            )
+                ? data.history
+                : [];
+
+
+        renderHistory(
+            historyData
+        );
+
+    }
+
+
+    function renderHistory(
+        entries
+    ) {
+
+        const body =
+            document.getElementById(
+                "historyBody"
+            );
+
+
+        if (
+            entries.length === 0
+        ) {
+
+            body.innerHTML = `
+                <tr>
+                    <td colspan="4" class="empty">
+                        Aucune intervention journalisée.
+                    </td>
+                </tr>
+            `;
+
+            return;
+
+        }
+
+
+        body.innerHTML = "";
+
+
+        entries.forEach(
+            entry => {
+
+                const tr =
+                    document.createElement(
+                        "tr"
+                    );
+
+
+                addCell(
+                    tr,
+                    formatDate(
+                        entry.timestamp
+                    )
+                );
+
+
+                addCell(
+                    tr,
+                    entry.action_id ||
+                    "—"
+                );
+
+
+                const statusCell =
+                    document.createElement(
+                        "td"
+                    );
+
+
+                const status =
+                    normalizeStatus(
+                        entry.status
+                    );
+
+
+                statusCell.innerHTML = `
+                    <span class="status-badge status-${status}">
+                        ${escapeHtml(status)}
+                    </span>
+                `;
+
+
+                tr.appendChild(
+                    statusCell
+                );
+
+
+                addCell(
+                    tr,
+                    entry.message ||
+                    "—"
+                );
+
+
+                body.appendChild(
+                    tr
+                );
+
+            }
+        );
+
+    }
+
+
+    /* =========================================================
+       HISTORY FILTER
+    ========================================================== */
+
+    function filterHistory() {
+
+        const query =
+            document.getElementById(
+                "historyFilter"
+            )
+            .value
+            .toLowerCase()
+            .trim();
+
+
+        if (!query) {
+
+            renderHistory(
+                historyData
+            );
+
+            return;
+
+        }
+
+
+        const filtered =
+            historyData.filter(
+                item => {
+
+                    const text =
+                        JSON.stringify(
+                            item
+                        )
+                        .toLowerCase();
+
+                    return text.includes(
+                        query
+                    );
+
+                }
+            );
+
+
+        renderHistory(
+            filtered
+        );
+
+    }
+
+
+    /* =========================================================
+       AUTO REFRESH
+    ========================================================== */
+
+    function startAutoRefresh() {
+
+        if (refreshTimer) {
+
+            clearInterval(
+                refreshTimer
+            );
+
+        }
+
+
+        if (countdownTimer) {
+
+            clearInterval(
+                countdownTimer
+            );
+
+        }
+
+
+        countdownValue =
+            REFRESH_INTERVAL;
+
+
+        refreshTimer =
+            setInterval(
+                async () => {
+
+                    await refresh();
+
+                    countdownValue =
+                        REFRESH_INTERVAL;
+
+                },
+
+                REFRESH_INTERVAL * 1000
+            );
+
+
+        countdownTimer =
+            setInterval(
+                () => {
+
+                    countdownValue =
+                        Math.max(
+                            0,
+                            countdownValue - 1
+                        );
+
+
+                    document.getElementById(
+                        "countdown"
+                    ).textContent =
+                        countdownValue + " s";
+
+                },
+
+                1000
+            );
+
+    }
+
+
+    /* =========================================================
+       CONNECTION STATUS
+    ========================================================== */
+
+    function updateConnectionStatus(
+        status
+    ) {
+
+        const container =
+            document.getElementById(
+                "connectionStatus"
+            );
+
+
+        const text =
+            document.getElementById(
+                "connectionText"
+            );
+
+
+        container.classList.remove(
+            "online",
+            "offline"
+        );
+
+
+        if (
+            status === "online"
+        ) {
+
+            container.classList.add(
+                "online"
+            );
+
+            text.textContent =
+                "Connecté · Prometheus";
+
+        }
+
+        else if (
+            status === "offline"
+        ) {
+
+            container.classList.add(
+                "offline"
+            );
+
+            text.textContent =
+                "Connexion perdue";
+
+        }
+
+        else {
+
+            text.textContent =
+                "Connexion...";
+
+        }
+
+    }
+
+
+    /* =========================================================
+       FORMAT NETWORK
+    ========================================================== */
+
+    function formatBytesPerSecond(
+        value
+    ) {
+
+        if (
+            value === null ||
+            value === undefined ||
+            !isFinite(
+                Number(value)
+            )
+        ) {
+
+            return "—";
+
+        }
+
+
+        value =
+            Number(value);
+
+
+        if (
+            value >= 1024 * 1024
+        ) {
+
+            return (
+                value /
+                (1024 * 1024)
+            ).toFixed(2)
+            + " MB/s";
+
+        }
+
+
+        if (
+            value >= 1024
+        ) {
+
+            return (
+                value /
+                1024
+            ).toFixed(2)
+            + " KB/s";
+
+        }
+
+
+        return (
+            value.toFixed(1)
+            + " B/s"
+        );
+
+    }
+
+
+    /* =========================================================
+       HELPERS
+    ========================================================== */
+
+    function setText(
+        id,
+        value
+    ) {
+
+        const element =
+            document.getElementById(
+                id
+            );
+
+
+        if (element) {
+
+            element.textContent =
+                value;
+
+        }
+
+    }
+
+
+    function addCell(
+        row,
+        value
+    ) {
+
+        const cell =
+            document.createElement(
+                "td"
+            );
+
+
+        cell.textContent =
+            value ?? "—";
+
+
+        row.appendChild(
+            cell
+        );
+
+    }
+
+
+    function formatDate(
+        value
+    ) {
+
+        if (!value) {
+
+            return "—";
+
+        }
+
+
+        const date =
+            new Date(value);
+
+
+        if (
+            isNaN(
+                date.getTime()
+            )
+        ) {
+
+            return value;
+
+        }
+
+
+        return date.toLocaleString(
+            "fr-FR"
+        );
+
+    }
+
+
+    function normalizeStatus(
+        status
+    ) {
+
+        const value =
+            String(
+                status ||
+                "pending"
+            )
+            .toLowerCase();
+
+
+        if (
+            value.includes(
+                "resolve"
+            )
+        ) {
+
+            return "resolved";
+
+        }
+
+
+        if (
+            value.includes(
+                "success"
+            )
+        ) {
+
+            return "resolved";
+
+        }
+
+
+        if (
+            value.includes(
+                "escal"
+            )
+        ) {
+
+            return "escalated";
+
+        }
+
+
+        if (
+            value.includes(
+                "fail"
+            )
+        ) {
+
+            return "failed";
+
+        }
+
+
+        if (
+            value.includes(
+                "run"
+            )
+        ) {
+
+            return "running";
+
+        }
+
+
+        return "pending";
+
+    }
+
+
+    function escapeHtml(
+        value
+    ) {
+
+        return String(
+            value ?? ""
+        )
+        .replace(
+            /&/g,
+            "&amp;"
+        )
+        .replace(
+            /</g,
+            "&lt;"
+        )
+        .replace(
+            />/g,
+            "&gt;"
+        )
+        .replace(
+            /"/g,
+            "&quot;"
+        )
+        .replace(
+            /'/g,
+            "&#039;"
+        );
+
+    }
+
+
+    function escapeJs(
+        value
+    ) {
+
+        return String(
+            value ?? ""
+        )
+        .replace(
+            /\\/g,
+            "\\\\"
+        )
+        .replace(
+            /'/g,
+            "\\'"
+        );
+
+    }
+
+
+    /* =========================================================
+       TOAST
+    ========================================================== */
+
+    let toastTimer = null;
+
+
+    function showToast(
+        message,
+        type = "success"
+    ) {
+
+        const toast =
+            document.getElementById(
+                "toast"
+            );
+
+
+        toast.textContent =
+            message;
+
+
+        toast.className =
+            "show " + type;
+
+
+        if (toastTimer) {
+
+            clearTimeout(
+                toastTimer
+            );
+
+        }
+
+
+        toastTimer =
+            setTimeout(
+                () => {
+
+                    toast.className = "";
+
+                },
+
+                3500
+            );
+
+    }
+
 </script>
 
 </body>
