@@ -1,0 +1,10 @@
+﻿apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: devops-agent-config
+  namespace: devops-agent
+data:
+  PROMETHEUS_URL: "http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090"
+  AUDIT_BACKEND: "sqlite"
+  AUDIT_DB_PATH: "/app/data/audit.sqlite3"
+  PYTHONUNBUFFERED: "1"

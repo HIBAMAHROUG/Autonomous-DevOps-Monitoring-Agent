@@ -5,14 +5,12 @@ import os
 import json
 from datetime import datetime
 from api.dashboard import dashboard_api
-from api.prometheus import prometheus_api
 from api.approvals import approvals_api
 from api.routes import metrics_api
 
 app = Flask(__name__, template_folder=os.path.join(os.path.dirname(__file__), '..', 'templates'))
 CORS(app)
 app.register_blueprint(dashboard_api)
-app.register_blueprint(prometheus_api)
 app.register_blueprint(approvals_api)
 app.register_blueprint(metrics_api)
 

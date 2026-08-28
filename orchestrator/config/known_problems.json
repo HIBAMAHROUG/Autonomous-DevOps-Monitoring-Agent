@@ -1,0 +1,67 @@
+[
+  {
+    "problem_id": "PB-OOM-001",
+    "title": "Pod OOMKilled",
+    "category": "OutOfMemory",
+    "metric": "OutOfMemory",
+    "condition": "pod killed by OOM killer",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 0,
+    "known_causes": ["memory leak", "unbounded cache growth", "traffic spike"],
+    "corrective_actions": ["ACT-RESTART-POD", "ACT-SCALE-OUT"],
+    "severity_default": "critical",
+    "tags": ["memory", "oom", "kubernetes"]
+  },
+  {
+    "problem_id": "PB-DISK-001",
+    "title": "Disk full on node or volume",
+    "category": "resource_exhaustion",
+    "metric": "DiskFull",
+    "condition": "no space left on device",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 0,
+    "known_causes": ["unrotated logs", "orphaned temp files"],
+    "corrective_actions": ["ACT-CLEAN-DISK"],
+    "severity_default": "high",
+    "tags": ["disk", "storage", "kubernetes"]
+  },
+  {
+    "problem_id": "PB-NET-001",
+    "title": "Upstream network timeout",
+    "category": "network",
+    "metric": "NetworkTimeout",
+    "condition": "connection timed out",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 0,
+    "known_causes": ["upstream dependency degraded", "DNS resolution failure"],
+    "corrective_actions": ["ACT-FAILOVER"],
+    "severity_default": "high",
+    "tags": ["network", "timeout", "kubernetes"]
+  },
+  {
+    "problem_id": "PB-CRASH-001",
+    "title": "Pod stuck in CrashLoopBackOff",
+    "category": "stability",
+    "metric": "CrashLoop",
+    "condition": "container repeatedly crashing",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 0,
+    "known_causes": ["bad deployment/release", "misconfiguration"],
+    "corrective_actions": ["ACT-ROLLBACK"],
+    "severity_default": "critical",
+    "tags": ["crashloop", "deployment", "kubernetes"]
+  },
+  {
+    "problem_id": "PB-CONN-001",
+    "title": "Connection refused from dependent service",
+    "category": "network",
+    "metric": "ConnectionRefused",
+    "condition": "connection refused",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 0,
+    "known_causes": ["dependent service down", "network policy blocking traffic"],
+    "corrective_actions": ["ACT-RESTART-POD", "ACT-FAILOVER"],
+    "severity_default": "high",
+    "tags": ["network", "connection", "kubernetes"]
+  }
+]

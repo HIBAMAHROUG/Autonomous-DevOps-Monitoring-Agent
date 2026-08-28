@@ -1,15 +1,15 @@
 [
     {
-        "timestamp": "2026-08-27T04:57:10.533019+00:00",
-        "service": "test",
-        "pod": null,
+        "timestamp": "2026-08-28T01:24:40.872732+00:00",
+        "service": "demo-service-critical",
+        "pod": "demo-pod-critical",
         "metric": "CPU",
         "metric_key": "cpu",
-        "value": 95.0,
+        "value": 99.5,
         "threshold": 90.0,
         "baseline": null,
         "trend_multiplier": 1.5,
-        "sustained_seconds": 300.0,
+        "sustained_seconds": 301.0,
         "required_duration": 300.0,
         "severity": "CRITICAL",
         "maintenance_window": null

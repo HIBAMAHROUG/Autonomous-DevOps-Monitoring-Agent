@@ -1,7 +1,12 @@
 ﻿"""API du tableau de bord de l'agent DevOps."""
 
 from __future__ import annotations
-
+from datetime import timedelta
+import detector.pipeline as pipeline_module
+from detector.detector import _default_detector
+from detector.pipeline import check_and_confirm, _get_ml_detector
+from anomaly_agent.severity import classify_severity
+from orchestrator.orchestrator import handle_alert
 import os
 from datetime import datetime, timezone
 
@@ -158,6 +163,7 @@ def _classify_entry(entry: dict) -> str:
     "/dashboard",
     methods=["GET"],
 )
+
 def dashboard_page():
 
     return render_template(
@@ -532,6 +538,114 @@ def test_critical():
         "incident": incident,
     })
 
+
+# ============================================================
+# SIMULATION D'INCIDENT RÉEL (passe par le vrai pipeline)
+# ============================================================
+
+@dashboard_api.route(
+    "/api/dashboard/simulate-real-incident",
+    methods=["POST"],
+)
+def simulate_real_incident():
+    """
+    Déclenche un vrai incident via le pipeline complet
+    (detector -> anomaly_agent -> orchestrator -> executor),
+    dans CE processus Flask, pour que decision_log soit bien
+    peuplé et visible sur le dashboard.
+
+    Body JSON attendu :
+        {
+            "scenario": "auto" | "critical",
+            "cpu_usage": 93.0,        (optionnel)
+            "memory_usage": 40.0,     (optionnel)
+            "network_usage": 40.0,    (optionnel)
+            "disk_usage": 40.0        (optionnel)
+        }
+
+    Les 4 métriques sont envoyées au modèle ML (IsolationForest),
+    qui attend cpu_usage/memory_usage/network_usage/disk_usage.
+    N'envoyer que cpu_usage dilue l'anomalie et empêche d'atteindre
+    la sévérité "critical".
+    """
+    if not _check_api_key():
+        return jsonify({
+            "error": "Unauthorized"
+        }), 401
+
+    body = request.get_json(silent=True) or {}
+    scenario = body.get("scenario", "auto")
+
+    default_cpu = 93.0 if scenario == "auto" else 99.9
+    default_other = 40.0 if scenario == "auto" else 99.0
+
+    cpu_value = float(body.get("cpu_usage", default_cpu))
+    memory_value = float(body.get("memory_usage", default_other))
+    network_value = float(body.get("network_usage", default_other))
+    disk_value = float(body.get("disk_usage", default_other))
+
+    service_name = f"demo-service-{scenario}"
+    pod_name = f"demo-pod-{scenario}"
+
+    now0 = datetime.now(timezone.utc)
+    metrics = {
+        "cpu_usage": cpu_value,
+        "memory_usage": memory_value,
+        "network_usage": network_value,
+        "disk_usage": disk_value,
+    }
+
+    # 1er appel : amorce le compteur de dépassement (_breach_since).
+    check_and_confirm(metrics, service=service_name)
+
+    # 2e appel : simule que 301s se sont écoulées (durée minimale = 300s).
+    now1 = now0 + timedelta(seconds=301)
+    threshold_alerts = _default_detector.check(
+        metrics,
+        service=service_name,
+        pod=pod_name,
+        now=now1,
+    )
+
+    if not threshold_alerts:
+        return jsonify({
+            "error": (
+                "Le pré-filtre n'a déclenché aucune alerte pour "
+                f"cpu_usage={cpu_value}. Augmente cette valeur."
+            )
+        }), 400
+
+    # Détecteur ML frais à chaque appel, pour éviter que la baseline
+    # EWMA interne soit polluée par un appel précédent.
+    pipeline_module._ml_detector = None
+    ml_detector = _get_ml_detector()
+    score, z_scores = ml_detector.score_sample(metrics)
+    severity = classify_severity(score, ml_detector.thresholds)
+
+    if severity is None:
+        return jsonify({
+            "error": (
+                f"Le modèle ML n'a pas confirmé l'anomalie (score={score:.4f}). "
+                "Augmente les valeurs de métriques."
+            )
+        }), 400
+
+    alert = {
+        **threshold_alerts[0],
+        "ml_score": round(score, 4),
+        "severity": severity,
+        "z_scores": {k: round(v, 2) for k, v in z_scores.items()},
+    }
+
+    result = handle_alert(alert, pod=pod_name, dry_run=True)
+
+    return jsonify({
+        "scenario": scenario,
+        "metrics": metrics,
+        "ml_score": round(score, 4),
+        "severity": severity,
+        "orchestrator_result": result,
+    })
 
 # ============================================================
 # TEST INCIDENTS
