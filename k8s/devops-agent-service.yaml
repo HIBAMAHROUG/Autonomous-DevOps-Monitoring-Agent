@@ -1,0 +1,15 @@
+﻿apiVersion: v1
+kind: Service
+metadata:
+  name: devops-agent
+  namespace: devops-agent
+  labels:
+    app: devops-agent
+spec:
+  selector:
+    app: devops-agent
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+  type: ClusterIP

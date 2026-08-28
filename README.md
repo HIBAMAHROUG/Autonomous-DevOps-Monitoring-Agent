@@ -160,6 +160,12 @@ Le pipeline CI/CD utilise **GitHub Actions** (fichier `.github/workflows/ci.yml`
  docker build -t autonomous-devops-agent .
  docker compose up
 
+Pour déployer l'agent (dashboard, API, remédiation) sur un cluster
+Kubernetes de test (Minikube), avec les droits RBAC nécessaires aux
+actions de remédiation, voir `docs/k8s-agent-deployment.md`. Ce guide
+complète `docs/minikube-monitoring-rebuild.md`, qui installe la stack
+d'observabilité (Prometheus, Loki, Grafana).
+
 ## Licence
 
 À définir.
