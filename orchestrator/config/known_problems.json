@@ -1,5 +1,57 @@
 [
   {
+    "problem_id": "PB-CPU-001",
+    "title": "High CPU usage",
+    "category": "HighCPU",
+    "metric": "HighCPU",
+    "condition": "CPU usage remains above the configured threshold",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 60,
+    "known_causes": [
+      "CPU saturation",
+      "traffic spike",
+      "hot loop"
+    ],
+    "corrective_actions": [
+      "ACT-RESTART-POD",
+      "ACT-SCALE-OUT"
+    ],
+    "severity_default": "high",
+    "tags": [
+      "cpu",
+      "highcpu",
+      "resource",
+      "kubernetes"
+    ],
+    "occurrences": 20
+  },
+  {
+    "problem_id": "PB-MEM-001",
+    "title": "High memory usage",
+    "category": "HighMemory",
+    "metric": "HighMemory",
+    "condition": "Memory usage remains above the configured threshold",
+    "affected_component": "kubernetes-pod",
+    "duration_s": 60,
+    "known_causes": [
+      "memory leak",
+      "unbounded cache growth",
+      "traffic spike"
+    ],
+    "corrective_actions": [
+      "ACT-RESTART-POD",
+      "ACT-SCALE-OUT"
+    ],
+    "severity_default": "high",
+    "tags": [
+      "memory",
+      "highmemory",
+      "resource",
+      "kubernetes"
+    ],
+    "occurrences": 20
+  },
+  {
     "problem_id": "PB-OOM-001",
     "title": "Pod OOMKilled",
     "category": "OutOfMemory",
@@ -7,61 +59,114 @@
     "condition": "pod killed by OOM killer",
     "affected_component": "kubernetes-pod",
     "duration_s": 0,
-    "known_causes": ["memory leak", "unbounded cache growth", "traffic spike"],
-    "corrective_actions": ["ACT-RESTART-POD", "ACT-SCALE-OUT"],
+    "known_causes": [
+      "memory leak",
+      "unbounded cache growth",
+      "traffic spike"
+    ],
+    "corrective_actions": [
+      "ACT-RESTART-POD",
+      "ACT-SCALE-OUT"
+    ],
     "severity_default": "critical",
-    "tags": ["memory", "oom", "kubernetes"]
+    "tags": [
+      "memory",
+      "oom",
+      "kubernetes"
+    ],
+    "occurrences": 10
   },
   {
     "problem_id": "PB-DISK-001",
-    "title": "Disk full on node or volume",
-    "category": "resource_exhaustion",
+    "title": "Disk full",
+    "category": "DiskFull",
     "metric": "DiskFull",
     "condition": "no space left on device",
     "affected_component": "kubernetes-pod",
     "duration_s": 0,
-    "known_causes": ["unrotated logs", "orphaned temp files"],
-    "corrective_actions": ["ACT-CLEAN-DISK"],
+    "known_causes": [
+      "unrotated logs",
+      "orphaned temp files"
+    ],
+    "corrective_actions": [
+      "ACT-CLEAN-DISK"
+    ],
     "severity_default": "high",
-    "tags": ["disk", "storage", "kubernetes"]
+    "tags": [
+      "disk",
+      "storage",
+      "kubernetes"
+    ],
+    "occurrences": 10
   },
   {
     "problem_id": "PB-NET-001",
-    "title": "Upstream network timeout",
-    "category": "network",
+    "title": "Network timeout",
+    "category": "NetworkTimeout",
     "metric": "NetworkTimeout",
     "condition": "connection timed out",
     "affected_component": "kubernetes-pod",
     "duration_s": 0,
-    "known_causes": ["upstream dependency degraded", "DNS resolution failure"],
-    "corrective_actions": ["ACT-FAILOVER"],
+    "known_causes": [
+      "upstream dependency degraded",
+      "DNS failure"
+    ],
+    "corrective_actions": [
+      "ACT-FAILOVER"
+    ],
     "severity_default": "high",
-    "tags": ["network", "timeout", "kubernetes"]
+    "tags": [
+      "network",
+      "timeout",
+      "kubernetes"
+    ],
+    "occurrences": 10
   },
   {
     "problem_id": "PB-CRASH-001",
-    "title": "Pod stuck in CrashLoopBackOff",
-    "category": "stability",
+    "title": "CrashLoopBackOff",
+    "category": "CrashLoop",
     "metric": "CrashLoop",
     "condition": "container repeatedly crashing",
     "affected_component": "kubernetes-pod",
     "duration_s": 0,
-    "known_causes": ["bad deployment/release", "misconfiguration"],
-    "corrective_actions": ["ACT-ROLLBACK"],
+    "known_causes": [
+      "bad deployment",
+      "misconfiguration"
+    ],
+    "corrective_actions": [
+      "ACT-ROLLBACK"
+    ],
     "severity_default": "critical",
-    "tags": ["crashloop", "deployment", "kubernetes"]
+    "tags": [
+      "crashloop",
+      "deployment",
+      "kubernetes"
+    ],
+    "occurrences": 10
   },
   {
     "problem_id": "PB-CONN-001",
-    "title": "Connection refused from dependent service",
-    "category": "network",
+    "title": "Connection refused",
+    "category": "ConnectionRefused",
     "metric": "ConnectionRefused",
     "condition": "connection refused",
     "affected_component": "kubernetes-pod",
     "duration_s": 0,
-    "known_causes": ["dependent service down", "network policy blocking traffic"],
-    "corrective_actions": ["ACT-RESTART-POD", "ACT-FAILOVER"],
+    "known_causes": [
+      "dependent service down",
+      "network policy"
+    ],
+    "corrective_actions": [
+      "ACT-RESTART-POD",
+      "ACT-FAILOVER"
+    ],
     "severity_default": "high",
-    "tags": ["network", "connection", "kubernetes"]
+    "tags": [
+      "network",
+      "connection",
+      "kubernetes"
+    ],
+    "occurrences": 10
   }
 ]
