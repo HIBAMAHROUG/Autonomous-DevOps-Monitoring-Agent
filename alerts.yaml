@@ -1,0 +1,191 @@
+groups:
+  - name: infrastructure.rules
+    interval: 30s
+    rules:
+      # ============================================================
+      # CPU ALERTS
+      # ============================================================
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m])) * 100) > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% above 90% for more than 2 minutes."
+
+      - alert: VeryHighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m])) * 100) > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VERY HIGH CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | printf \"%.1f\" }}% above 95%! Immediate action required."
+
+      # ============================================================
+      # MEMORY ALERTS
+      # ============================================================
+      - alert: HighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})) * 100 > 85
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Memory Usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% above 85%."
+
+      - alert: VeryHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / node_memory_MemTotal_bytes{job="node-exporter"})) * 100 > 90
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VERY HIGH Memory Usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | printf \"%.1f\" }}% above 90%! Immediate action required."
+
+      # ============================================================
+      # DISK ALERTS
+      # ============================================================
+      - alert: HighDiskUsage
+        expr: ((node_filesystem_size_bytes{job="node-exporter",fstype!="tmpfs"} - node_filesystem_avail_bytes{job="node-exporter",fstype!="tmpfs"}) / node_filesystem_size_bytes{job="node-exporter",fstype!="tmpfs"}) * 100 > 90
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High Disk Usage on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | printf \"%.1f\" }}% above 90% on {{ $labels.mountpoint }}."
+
+      - alert: VeryHighDiskUsage
+        expr: ((node_filesystem_size_bytes{job="node-exporter",fstype!="tmpfs"} - node_filesystem_avail_bytes{job="node-exporter",fstype!="tmpfs"}) / node_filesystem_size_bytes{job="node-exporter",fstype!="tmpfs"}) * 100 > 95
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VERY HIGH Disk Usage on {{ $labels.instance }}"
+          description: "Disk usage is {{ $value | printf \"%.1f\" }}% above 95% on {{ $labels.mountpoint }}."
+
+      # ============================================================
+      # NETWORK ALERTS
+      # ============================================================
+      - alert: HighNetworkTraffic
+        expr: |
+          sum by(instance) (
+            rate(node_network_receive_bytes_total{job="node-exporter",device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+            + rate(node_network_transmit_bytes_total{job="node-exporter",device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+          ) > 10485760
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High Network Traffic on {{ $labels.instance }}"
+          description: "Network throughput is {{ $value | humanize }} bytes/s above 10 MiB/s."
+
+      - alert: VeryHighNetworkTraffic
+        expr: |
+          sum by(instance) (
+            rate(node_network_receive_bytes_total{job="node-exporter",device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+            + rate(node_network_transmit_bytes_total{job="node-exporter",device!~"lo|veth.*|cni0|docker0|flannel.*"}[5m])
+          ) > 52428800
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "VERY HIGH Network Traffic on {{ $labels.instance }}"
+          description: "Network throughput is {{ $value | humanize }} bytes/s above 50 MiB/s."
+
+      # ============================================================
+      # SERVICE DOWN ALERTS
+      # ============================================================
+      - alert: NodeExporterDown
+        expr: up{job="node-exporter"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Node Exporter is DOWN"
+          description: "Node Exporter instance {{ $labels.instance }} is not responding. Host metrics are unavailable."
+
+      - alert: PrometheusTargetMissing
+        expr: up == 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Prometheus Target is DOWN"
+          description: "Target {{ $labels.instance }} ({{ $labels.job }}) is not responding."
+
+      - alert: MonitoringAPIDown
+        expr: up{job="api"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Monitoring API is DOWN"
+          description: "The Monitoring API instance {{ $labels.instance }} is not responding."
+
+      # ============================================================
+      # PREDICTIVE ALERTS (Machine Learning)
+      # ============================================================
+      - alert: PredictedHighCPUUsage
+        expr: predict_linear(node_cpu_seconds_total{job="node-exporter",mode="user"}[1h], 3600) > 90
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Predicted High CPU Usage on {{ $labels.instance }}"
+          description: "CPU usage is predicted to exceed 90% in the next hour based on current trends."
+
+      - alert: PredictedDiskFull
+        expr: predict_linear(node_filesystem_free_bytes{job="node-exporter",fstype!="tmpfs"}[1h], 4 * 3600) < 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Predicted Disk Full on {{ $labels.instance }}"
+          description: "Disk on {{ $labels.mountpoint }} is predicted to be full within 4 hours."
+
+      # ============================================================
+      # SYSTEM LOAD ALERTS
+      # ============================================================
+      - alert: HighSystemLoad
+        expr: node_load15{job="node-exporter"} / count by(instance) (node_cpu_seconds_total{job="node-exporter",mode="idle"}) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High System Load on {{ $labels.instance }}"
+          description: "System load average is {{ $value | printf \"%.2f\" }} which is 80% of available CPU cores."
+
+      # ============================================================
+      # PROCESS ALERTS
+      # ============================================================
+      - alert: TooManyProcesses
+        expr: node_processes{job="node-exporter"} > 1000
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Too Many Processes on {{ $labels.instance }}"
+          description: "There are {{ $value }} processes running, which may indicate a fork bomb or process leak."
+
+      # ============================================================
+      # KUBERNETES ALERTS (si Kubernetes est utilisé)
+      # ============================================================
+      - alert: KubernetesPodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total[15m]) * 60 * 15 > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod CrashLooping detected"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been restarting frequently."
+
+      - alert: KubernetesPodNotReady
+        expr: sum by(namespace, pod) (kube_pod_status_phase{phase="Pending"}) > 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Pod Pending for too long"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been pending for more than 5 minutes."

@@ -3,11 +3,11 @@
 cpu:
   threshold: 70
   duration: 60
-  trend_multiplier: 1.10
+  trend_multiplier: null
 
 memory:
   threshold: 70
   duration: 60
-  trend_multiplier: 1.10
+  trend_multiplier: null
 
 maintenance_windows: []
