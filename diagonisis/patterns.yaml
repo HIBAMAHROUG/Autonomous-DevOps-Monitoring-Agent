@@ -7,6 +7,22 @@ categories:
       - "MemoryError"
     confidence: 0.95
 
+  HighMemory:
+    patterns:
+      - "memory pressure"
+      - "memory usage"
+      - "high memory"
+      - "memory threshold"
+    confidence: 0.85
+
+  HighCPU:
+    patterns:
+      - "CPU pressure"
+      - "high CPU"
+      - "CPU usage"
+      - "CPU threshold"
+    confidence: 0.85
+
   DiskFull:
     patterns:
       - "no space left on device"

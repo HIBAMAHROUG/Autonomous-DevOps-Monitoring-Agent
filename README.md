@@ -1,171 +1,139 @@
-﻿# Autonomous DevOps Monitoring Agent
+﻿# Autonomous DevOps Agent — End-to-End Pipeline Fix
 
-Agent DevOps autonome : surveillance d'infrastructure, détection d'anomalies, diagnostic et remédiation automatique, avec garde-fous de sécurité.
+## What this fixes
 
-## Pipeline de détection à deux étages
+The corrected bundle connects:
 
-Le pipeline combine deux systèmes :
+Prometheus -> Collector -> threshold detector -> ML confirmation -> Incident
+-> Loki diagnosis -> decision engine -> SafetyPolicy -> Kubernetes remediation
+-> Prometheus verification -> MTTR/dashboard.
 
-1. Étage 1 — pré-filtre : détection rapide avec seuils, durée, tendance et fenêtres de maintenance.
-2. Étage 2 — confirmation ML : Isolation Forest, analyse multivariée des quatre métriques et classification de sévérité.
+It also:
+- runs the collector as a dedicated Docker service;
+- fixes the Prometheus API URL;
+- fixes the `namespace/pod` -> `pod + namespace` mismatch;
+- implements Kubernetes pod restart (the previous executor was only a stub);
+- persists audit and approval data in SQLite so API + collector share state;
+- prevents repeated incidents every 30 seconds for the same sustained breach;
+- adds CPU and high-memory problems to the remediation knowledge base;
+- keeps Loki as the diagnostic source, with a metric fallback when Loki has no
+  matching ERROR/WARN pattern.
 
-Le pipeline unifié se trouve dans detector/pipeline.py et est utilisé par collector/collector.py.
+## 1. Copy the files
 
-## Structure du projet
+Replace only the files contained in this ZIP. Do NOT overwrite your existing
+dashboard/template files.
 
- collector/ Collecte CPU, RAM, réseau et disque depuis Prometheus
- detector/ Détection à seuils
- anomaly_agent/ Détection ML et API FastAPI
- diagnosis/ Agrégation des logs Loki
- remediation/ Décision, catalogue et garde-fous
- executor/ Exécution des actions
- storage/ Persistance des métriques et de l'audit
- api/ API Flask
- monitoring/ Configuration Prometheus, Loki et Grafana
- terraform/ Infrastructure as Code
- docs/ Documentation
+Keep your existing `kube-docker-config.yaml` for now, but see the security note.
 
-## Prérequis
+## 2. Set a real target pod
 
-- Python 3.11+
-- Kubernetes accessible via kubectl
-- Prometheus
-- Loki
-- InfluxDB
-- Docker
+For a deterministic demo, set this in docker-compose:
 
-## Installation sous Windows PowerShell
+    TARGET_POD: "YOUR-POD-NAME"
 
- python -m venv .venv
- .venv\Scripts\Activate.ps1
- pip install -r requirements.txt
- Copy-Item .env.example .env
+and:
 
-Ne jamais committer le fichier .env.
+    K8S_NAMESPACE: "default"
 
-## Variables d'environnement
+If TARGET_POD is omitted, the collector first tries the highest-CPU pod and then
+falls back to the first Running pod.
 
-| Variable | Description |
-|---|---|
-| INFLUX_URL | URL InfluxDB |
-| INFLUX_ORG | Organisation InfluxDB |
-| INFLUX_TOKEN | Token InfluxDB |
-| API_KEY | Clé API |
-| PROMETHEUS_URL | URL Prometheus |
-| PROMETHEUS_TOKEN | Token Prometheus optionnel |
-| SLACK_WEBHOOK_URL | Webhook Slack |
-| AGENT_OFFLINE_WEBHOOK_URL | Webhook secondaire pour l'alerte "Agent Offline" (Bug 3 : perte de connexion Kubernetes > 5 min). Retombe sur SLACK_WEBHOOK_URL si absent. |
-| SMTP_HOST | Serveur SMTP |
-| SMTP_PORT | Port SMTP |
-| SMTP_USER | Utilisateur SMTP |
-| SMTP_PASSWORD | Mot de passe SMTP |
-| APPROVAL_EMAIL_TO | Destinataire des approbations |
-| APPROVAL_EMAIL_FROM | Expéditeur des approbations |
-| AUDIT_BACKEND | sqlite ou postgres |
-| REMEDIATION_DB_HOST | Hôte PostgreSQL |
-| REMEDIATION_DB_PORT | Port PostgreSQL |
-| REMEDIATION_DB_NAME | Nom de la base PostgreSQL |
-| REMEDIATION_DB_USER | Utilisateur PostgreSQL |
-| REMEDIATION_DB_PASSWORD | Mot de passe PostgreSQL |
+## 3. Start
 
-## Persistance de l'audit
+PowerShell:
 
-Le système utilise storage/audit_store.py comme point d'entrée unique.
+    docker compose down
+    docker compose build --no-cache
+    docker compose up -d
 
-Deux backends sont disponibles :
+Then:
 
-- SQLite : backend par défaut pour les tests et le staging.
-- PostgreSQL : backend recommandé pour la production multi-instances.
+    docker compose ps
+    docker logs -f monitoring-collector
 
-### SQLite
+## 4. Expected collector logs
 
-Variable :
+You should see:
 
- AUDIT_BACKEND=sqlite
+    Target pod: ...
+    Confirmed incidents: 1
+    INCIDENT DETECTED
+    INCIDENT START
+    Loki ...
+    DECISION
+    AUTO_EXECUTE
+    REMEDIATION END
+    outcome=resolved
 
-Base locale :
+For a critical incident you should instead see:
 
- data/audit.sqlite3
+    SUGGEST_TO_HUMAN
+    Human approval required for critical action
 
-### PostgreSQL
+and the request should appear in:
 
-Variable :
+    GET /api/approvals/pending
 
- AUDIT_BACKEND=postgres
+## 5. Demo thresholds
 
-Configurer ensuite les variables REMEDIATION_DB_*.
+The supplied demo thresholds are intentionally low:
 
-Le schéma PostgreSQL est :
+    CPU > 70% for 60s
+    MEMORY > 70% for 60s
 
- storage/schema_audit.sql
+After the demo, restore production values such as:
 
-Le backend PostgreSQL est :
+    CPU > 90% for 300s
+    MEMORY > 85% for 300s
 
- storage/audit_store_postgres.py
+## 6. Test Kubernetes access from the container
 
-Le dispatcher est :
+    docker exec monitoring-collector kubectl --kubeconfig /app/kube-config/config get pods -A
 
- storage/audit_store.py
+Then test Loki:
 
-## Tests
+    docker exec monitoring-api python -c "import requests; print(requests.get('http://loki:3100/ready').text)"
 
-Exécuter tous les tests :
+Test Prometheus:
 
- python -m pytest -v
+    docker exec monitoring-collector python -c "import requests; print(requests.get('http://prometheus:9090/-/ready').text)"
 
-Collecter uniquement les tests :
+## 7. Loki / Alloy
 
- python -m pytest --collect-only -q
+The supplied Alloy configuration sends Kubernetes logs to the Docker Compose
+Loki at:
 
-Tester la persistance :
+    http://host.docker.internal:3100/loki/api/v1/push
 
- python -m pytest test_persistence.py -v
+This assumes Minikube is running with Docker Desktop and can resolve
+`host.docker.internal`.
 
-Tester le backend PostgreSQL :
+If your Minikube environment cannot resolve it, use a reachable host IP or
+NodePort instead and update `alloy/alloy-values.yaml`.
 
- python -m pytest test_audit_postgres.py -v
+## 8. IMPORTANT security note
 
-## Sécurité
+Your public GitHub repository currently contains `kube-docker-config.yaml` with
+embedded client certificate/private-key material. Treat that credential as
+exposed. Do not keep it in a public repository.
 
-Les actions passent par SafetyPolicy avant exécution.
+Generate a fresh kubeconfig/credential, remove the old key from the public repo,
+and use a secret or local ignored file.
 
-- limite d'actions par heure
-- limite d'actions par pod
-- protection anti-boucle
-- circuit breaker
-- kill switch
-- limitation du blast radius
-- approbation humaine pour les actions critiques
-- dry-run par défaut
-- retry avec backoff exponentiel sur les erreurs de connexion kubectl,
-  et alerte "Agent Offline" après 5 minutes de panne (executor/kubectl_client.py)
+## 9. Why the old pipeline did not heal
 
-## CI/CD
+The repository had several independent blockers:
+- collector called `check_metrics()` instead of `check_and_confirm()`;
+- compose did not start a collector process;
+- Prometheus URL in compose was missing `/api/v1/query`;
+- `PROMETHEUS_REQUIRE_AUTH` defaulted to true without a token in compose;
+- `get_highest_cpu_pod()` returns `namespace/pod`, while Loki expected only pod;
+- Kubernetes pod remediation executor returned "non implemente";
+- `dry_run` defaulted to true;
+- audit/approval state was in process memory, so API and collector could not
+  reliably share approval state;
+- the remediation knowledge base did not contain CPU/high-memory signatures;
+- sustained threshold alerts could be emitted repeatedly.
 
-Le pipeline CI/CD utilise **GitHub Actions** (fichier `.github/workflows/ci.yml`), et non **GitLab CI** comme indiqué initialement dans le cahier des charges.
-
-**Pourquoi cet écart :**
-
-- Le dépôt du projet est hébergé sur GitHub, pas sur GitLab (ni gitlab.com, ni une instance auto-hébergée). Utiliser GitLab CI aurait nécessité de dupliquer le dépôt sur un second hébergeur, ou de connecter un GitLab externe uniquement pour l'intégration continue.
-- GitHub Actions est intégré nativement au dépôt : aucun outil supplémentaire à provisionner, aucun runner externe à configurer, et les workflows restent versionnés avec le code.
-- Le pipeline logique décrit au cahier reste respecté à l'identique dans son contenu : installation des dépendances, exécution de la suite de tests (`pytest`), puis build de l'image Docker. Seul l'outil d'exécution change.
-
-**Ce qui est exécuté à chaque push/pull request sur `main` :**
-
-1. Job `test` : checkout, installation de Python 3.13, installation des dépendances (`requirements.txt`), exécution de `python -m pytest -q`.
-2. Job `docker-build` (dépend de `test`) : build de l'image `autonomous-devops-agent:test` à partir du `Dockerfile`.
-
-## Déploiement
-
- docker build -t autonomous-devops-agent .
- docker compose up
-
-Pour déployer l'agent (dashboard, API, remédiation) sur un cluster
-Kubernetes de test (Minikube), avec les droits RBAC nécessaires aux
-actions de remédiation, voir `docs/k8s-agent-deployment.md`. Ce guide
-complète `docs/minikube-monitoring-rebuild.md`, qui installe la stack
-d'observabilité (Prometheus, Loki, Grafana).
-
-## Licence
-
-À définir.
+This bundle addresses those blockers without redesigning your dashboard.

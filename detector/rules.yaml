@@ -1,11 +1,13 @@
+# DEMO VALUES: lower duration/thresholds for validation.
+# Restore stricter values after the end-to-end test.
 cpu:
-  threshold: 90
-  duration: 300
-  trend_multiplier: 1.5
+  threshold: 70
+  duration: 60
+  trend_multiplier: 1.10
 
 memory:
-  threshold: 85
-  duration: 300
-  trend_multiplier: 1.5
+  threshold: 70
+  duration: 60
+  trend_multiplier: 1.10
 
 maintenance_windows: []

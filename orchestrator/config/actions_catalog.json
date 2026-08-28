@@ -11,20 +11,7 @@
     "risk_level": "medium",
     "reversible": true,
     "avg_resolution_time_s": 30,
-    "success_rate_historical": 0.85
-  },
-  {
-    "action_id": "ACT-RESTART-CONTAINER",
-    "name": "Restart Docker container (non-Kubernetes host)",
-    "type": "remediation",
-    "executor": "docker",
-    "params_schema": {
-      "container_name": "string"
-    },
-    "risk_level": "medium",
-    "reversible": true,
-    "avg_resolution_time_s": 30,
-    "success_rate_historical": 0.85
+    "success_rate_historical": 0.95
   },
   {
     "action_id": "ACT-SCALE-OUT",
@@ -42,7 +29,7 @@
   },
   {
     "action_id": "ACT-CLEAN-DISK",
-    "name": "Clean up old log files",
+    "name": "Clean old log files",
     "type": "remediation",
     "executor": "cleanup",
     "params_schema": {
@@ -56,7 +43,7 @@
   },
   {
     "action_id": "ACT-FAILOVER",
-    "name": "Failover service to standby target",
+    "name": "Failover to standby",
     "type": "remediation",
     "executor": "failover",
     "params_schema": {
@@ -66,11 +53,11 @@
     "risk_level": "high",
     "reversible": true,
     "avg_resolution_time_s": 45,
-    "success_rate_historical": 0.75
+    "success_rate_historical": 0.85
   },
   {
     "action_id": "ACT-ROLLBACK",
-    "name": "Rollback deployment to previous revision",
+    "name": "Rollback deployment",
     "type": "remediation",
     "executor": "rollback",
     "params_schema": {

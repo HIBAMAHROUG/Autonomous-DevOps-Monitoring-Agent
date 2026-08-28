@@ -14,7 +14,7 @@ services:
       DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: monitoring-token
     volumes:
       - influxdb-data:/var/lib/influxdb2
-    restart: always
+    restart: unless-stopped
 
   prometheus:
     image: prom/prometheus:latest
@@ -22,13 +22,13 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
       - prometheus-data:/prometheus
     command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-      - '--web.enable-lifecycle'
-    restart: always
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+    restart: unless-stopped
 
   node-exporter:
     image: prom/node-exporter:latest
@@ -36,12 +36,12 @@ services:
     ports:
       - "9100:9100"
     command:
-      - '--path.rootfs=/host'
+      - "--path.rootfs=/host"
     volumes:
       - /proc:/host/proc:ro
       - /sys:/host/sys:ro
       - /:/rootfs:ro
-    restart: always
+    restart: unless-stopped
 
   grafana:
     image: grafana/grafana:latest
@@ -49,18 +49,18 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - GF_SECURITY_ADMIN_USER=admin
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_INSTALL_PLUGINS=grafana-piechart-panel
-      - GF_AUTH_ANONYMOUS_ENABLED=true
-      - GF_AUTH_ANONYMOUS_ORG_ROLE=Viewer
-      - GF_SECURITY_ALLOW_EMBEDDING=true
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
     volumes:
       - grafana-data:/var/lib/grafana
       - ./grafana/provisioning:/etc/grafana/provisioning
     depends_on:
       - prometheus
-    restart: always
+      - loki
+    restart: unless-stopped
 
   loki:
     image: grafana/loki:2.9.0
@@ -68,7 +68,7 @@ services:
     ports:
       - "3100:3100"
     command: -config.file=/etc/loki/local-config.yaml
-    restart: always
+    restart: unless-stopped
 
   api:
     build: .
@@ -77,19 +77,20 @@ services:
     ports:
       - "5000:5000"
     environment:
-      SLACK_WEBHOOK_URL: "https://hooks.slack.com/services/TON/WEBHOOK/ICI"
+      PYTHONUNBUFFERED: "1"
+      API_KEY: "change-me"
+      PROMETHEUS_URL: http://prometheus:9090/api/v1/query
+      PROMETHEUS_REQUIRE_AUTH: "false"
+      LOKI_URL: http://loki:3100
       INFLUX_URL: http://influxdb:8086
       INFLUX_ORG: monitoring
       INFLUX_BUCKET: ai-agent
       INFLUX_TOKEN: monitoring-token
-      METRICS_RETENTION_DAYS: "30"
       AUDIT_BACKEND: sqlite
       AUDIT_DB_PATH: /app/data/audit.sqlite3
-      PYTHONUNBUFFERED: 1
-      PROMETHEUS_URL: http://prometheus:9090
-      LOKI_URL: http://loki:3100
-      API_KEY: "ma-cle-secrete-locale"
       KUBECONFIG: /app/kube-config/config
+      K8S_NAMESPACE: default
+      REMEDIATION_BACKEND: json
     volumes:
       - ./data:/app/data
       - ./kube-docker-config.yaml:/app/kube-config/config:ro
@@ -97,8 +98,41 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - influxdb
+      - prometheus
       - loki
-    restart: always
+    restart: unless-stopped
+
+  collector:
+    build: .
+    container_name: monitoring-collector
+    command: python -u -m collector.collector
+    environment:
+      PYTHONUNBUFFERED: "1"
+      PROMETHEUS_URL: http://prometheus:9090/api/v1/query
+      PROMETHEUS_REQUIRE_AUTH: "false"
+      LOKI_URL: http://loki:3100
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_ORG: monitoring
+      INFLUX_BUCKET: ai-agent
+      INFLUX_TOKEN: monitoring-token
+      AUDIT_BACKEND: sqlite
+      AUDIT_DB_PATH: /app/data/audit.sqlite3
+      KUBECONFIG: /app/kube-config/config
+      K8S_NAMESPACE: default
+      REMEDIATION_BACKEND: json
+      AUTO_REMEDIATION_ENABLED: "true"
+      DRY_RUN: "false"
+      COLLECTION_INTERVAL_SECONDS: "30"
+    volumes:
+      - ./data:/app/data
+      - ./kube-docker-config.yaml:/app/kube-config/config:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - influxdb
+      - prometheus
+      - loki
+    restart: unless-stopped
 
 volumes:
   influxdb-data:
