@@ -423,7 +423,20 @@ def simulate_real_incident():
 
     pipeline_module._ml_detector = None
     ml_detector = _get_ml_detector()
-    score, z_scores = ml_detector.score_sample(metrics)
+
+    if ml_detector is None:
+        return jsonify({
+            "error": "Le modèle ML est indisponible côté serveur "
+            "(voir les logs du conteneur pour la cause exacte)."
+        }), 503
+
+    try:
+        score, z_scores = ml_detector.score_sample(metrics)
+    except Exception as exc:
+        logger.exception("Échec du scoring ML dans simulate_real_incident")
+        return jsonify({
+            "error": f"Le scoring ML a échoué : {exc}"
+        }), 500
 
     severity = classify_severity(score, ml_detector.thresholds)
 

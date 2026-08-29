@@ -1,6 +1,4 @@
-﻿
-
-from __future__ import annotations
+﻿from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Optional
@@ -10,9 +8,13 @@ from detector.detector import check_metrics
 logger = logging.getLogger(__name__)
 
 try:
-    from anomaly_agent.isolation_forest import IsolationForestDetector
+    # anomaly_agent.isolation_forest / IsolationForestDetector n'existent pas
+    # dans ce repo : la vraie classe est AnomalyDetector dans
+    # anomaly_agent/model.py (score_sample(), thresholds, .load() qui
+    # bootstrap automatiquement un modèle si aucun artefact n'existe).
+    from anomaly_agent.model import AnomalyDetector
 except Exception:
-    IsolationForestDetector = None
+    AnomalyDetector = None
 
 
 _ml_detector = None
@@ -30,7 +32,7 @@ def _get_ml_detector():
     if _ml_detector is not None:
         return _ml_detector
 
-    if IsolationForestDetector is None:
+    if AnomalyDetector is None:
         logger.warning(
             "Isolation Forest component is unavailable. "
             "Threshold confirmation will be used."
@@ -38,7 +40,10 @@ def _get_ml_detector():
         return None
 
     try:
-        _ml_detector = IsolationForestDetector()
+        # .load() charge le modèle entraîné depuis disque, ou en
+        # bootstrap un automatiquement (données mock) s'il n'existe pas
+        # encore — voir AnomalyDetector.load() dans anomaly_agent/model.py.
+        _ml_detector = AnomalyDetector.load()
         return _ml_detector
     except Exception as exc:
         logger.warning(

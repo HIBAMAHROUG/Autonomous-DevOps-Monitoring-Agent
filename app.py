@@ -24,4 +24,8 @@ start_background_monitor()
 
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=True)
+    # use_reloader=False : le reloader Werkzeug surveille les fichiers et
+    # relance le process au moindre changement détecté sous /app — inutile
+    # ici et risqué si une requête écrit un fichier (ex: modèle ML) pendant
+    # son traitement.
+    app.run(host="0.0.0.0", port=5000, debug=True, use_reloader=False)
