@@ -3,6 +3,7 @@
 from api import metrics_api
 from api.approvals import approvals_api
 from api.dashboard import dashboard_api
+from monitor_loop import start_background_monitor
 
 
 def create_app() -> Flask:
@@ -14,6 +15,12 @@ def create_app() -> Flask:
 
 
 app = create_app()
+
+# Démarre la boucle de surveillance autonome (thread daemon) : sans cet
+# appel, monitor_loop.py n'est jamais exécuté et aucune remédiation
+# automatique ne se déclenche, même si Prometheus/le dashboard
+# détectent bien les métriques et incidents.
+start_background_monitor()
 
 
 if __name__ == "__main__":

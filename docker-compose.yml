@@ -1,4 +1,4 @@
-services:
+﻿services:
   influxdb:
     image: influxdb:2.7
     container_name: influxdb
@@ -102,6 +102,10 @@ services:
       - ./data:/app/data
       - ./kube-docker-config.yaml:/app/kube-config/config:ro
       - ./api:/app/api
+      # Nécessaire pour que DockerExecutor puisse exécuter
+      # `docker restart <container>` sur les conteneurs de l'hôte
+      # depuis l'intérieur de monitoring-api.
+      - /var/run/docker.sock:/var/run/docker.sock
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
