@@ -374,6 +374,11 @@ def simulate_real_incident():
 
     body = request.get_json(silent=True) or {}
     scenario = body.get("scenario", "auto")
+    # Par défaut on reste en dry_run=True (sûr, aucune action réelle).
+    # Passe {"dry_run": false} dans le corps de la requête pour que ce
+    # endpoint déclenche une vraie remédiation (kubectl, docker, etc.)
+    # au lieu de se contenter de simuler.
+    dry_run = bool(body.get("dry_run", True))
 
     default_cpu = 93.0 if scenario == "auto" else 99.9
     default_other = 40.0 if scenario == "auto" else 99.0
@@ -438,7 +443,7 @@ def simulate_real_incident():
         },
     }
 
-    result = handle_alert(alert, pod=pod_name, dry_run=True)
+    result = handle_alert(alert, pod=pod_name, dry_run=dry_run)
 
     return jsonify({
         "scenario": scenario,
