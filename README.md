@@ -1,139 +1,318 @@
-﻿# Autonomous DevOps Agent — End-to-End Pipeline Fix
+# 🤖 Agent DevOps Autonome — Infrastructure Auto-Réparatrice
 
-## What this fixes
+![License](https://img.shields.io/badge/license-MIT-blue) ![Docker](https://img.shields.io/badge/docker-compose-blue) ![Kubernetes](https://img.shields.io/badge/kubernetes-1.24+-blue) ![Prometheus](https://img.shields.io/badge/Prometheus-2.45+-orange) ![Loki](https://img.shields.io/badge/Loki-2.8+-purple) ![Python](https://img.shields.io/badge/python-3.10+-yellow)
 
-The corrected bundle connects:
+> Pipeline de supervision, détection d'anomalies, diagnostic et remédiation automatique pour clusters Kubernetes — développé par **Smartovate Ltd**.
 
-Prometheus -> Collector -> threshold detector -> ML confirmation -> Incident
--> Loki diagnosis -> decision engine -> SafetyPolicy -> Kubernetes remediation
--> Prometheus verification -> MTTR/dashboard.
+---
 
-It also:
-- runs the collector as a dedicated Docker service;
-- fixes the Prometheus API URL;
-- fixes the `namespace/pod` -> `pod + namespace` mismatch;
-- implements Kubernetes pod restart (the previous executor was only a stub);
-- persists audit and approval data in SQLite so API + collector share state;
-- prevents repeated incidents every 30 seconds for the same sustained breach;
-- adds CPU and high-memory problems to the remediation knowledge base;
-- keeps Loki as the diagnostic source, with a metric fallback when Loki has no
-  matching ERROR/WARN pattern.
+## 📖 Sommaire
 
-## 1. Copy the files
+- [Contexte et objectifs](#-contexte-et-objectifs)
+- [Périmètre du projet](#-périmètre-du-projet)
+- [Architecture](#-architecture)
+- [Fonctionnalités](#-fonctionnalités)
+- [Stack technique](#️-stack-technique)
+- [Démarrage rapide](#-démarrage-rapide)
+- [Configuration](#️-configuration)
+- [Requêtes de supervision](#-requêtes-de-supervision)
+- [Sécurité](#-sécurité)
+- [Dépannage](#-dépannage)
+- [Backlog fonctionnel](#-backlog-fonctionnel)
+- [Risques identifiés et mesures correctives](#-risques-identifiés-et-mesures-correctives)
+- [Livrables](#-livrables)
+- [Planning](#-planning-prévisionnel)
+- [Contribuer](#-contribuer)
+- [Licence](#-licence)
 
-Replace only the files contained in this ZIP. Do NOT overwrite your existing
-dashboard/template files.
+---
 
-Keep your existing `kube-docker-config.yaml` for now, but see the security note.
+## 🎯 Contexte et objectifs
 
-## 2. Set a real target pod
+Smartovate Ltd, entreprise spécialisée dans le conseil en cloud computing, gère des infrastructures complexes pour de multiples clients. La gestion des incidents, bien qu'en partie automatisée, nécessite encore une intervention humaine significative pour le diagnostic et la résolution des pannes courantes, entraînant des temps d'arrêt prolongés et mobilisant les équipes DevOps sur des tâches répétitives à faible valeur ajoutée.
 
-For a deterministic demo, set this in docker-compose:
+L'**Agent DevOps Autonome** est un système intelligent capable de :
 
-    TARGET_POD: "YOUR-POD-NAME"
+- surveiller l'infrastructure en continu,
+- détecter les anomalies en temps réel,
+- analyser les logs pour identifier la cause racine,
+- exécuter des actions de remédiation de manière autonome (auto-réparation),
+- ou escalader vers un humain lorsque la situation l'exige.
 
-and:
+**Objectif chiffré :** réduire le *Mean Time To Recovery* (MTTR) de **40 %** sur les incidents de niveau 1 et 2, tout en offrant un tableau de bord permettant aux équipes de superviser les actions prises par l'agent.
 
-    K8S_NAMESPACE: "default"
+---
 
-If TARGET_POD is omitted, the collector first tries the highest-CPU pod and then
-falls back to the first Running pod.
+## 📦 Périmètre du projet
 
-## 3. Start
+### Inclus
+- Agent de surveillance connecté aux outils de monitoring existants (Prometheus / Grafana).
+- Moteur de règles / modèle léger pour l'analyse des logs et la prise de décision.
+- Scripts de remédiation automatisés (redémarrage de pods Kubernetes, ajustement de l'autoscaling, libération d'espace disque).
+- Interface de visualisation (dashboard) des incidents résolus et des actions en attente d'approbation.
+- Déploiement sur environnement de test Kubernetes (K3s / Minikube).
 
-PowerShell:
+### Exclus
+- Gestion des incidents de sécurité complexes (SecOps).
+- Déploiement en environnement de production client (limité au staging/test).
+- Développement d'un système de monitoring from scratch (réutilisation des outils existants).
 
-    docker compose down
-    docker compose build --no-cache
-    docker compose up -d
+---
 
-Then:
+## 🧩 Architecture
 
-    docker compose ps
-    docker logs -f monitoring-collector
+```mermaid
+flowchart TD
+    A[Prometheus] -->|métriques| B[Collector]
+    C[Alloy] -->|logs| D[Loki]
+    D -->|requêtes diagnostiques| B
+    B -->|détection de seuil| E[Incident Manager]
+    E -->|confirmation| F[Decision Engine]
+    F -->|critique ?| G{Safety Policy}
+    G -->|auto| H[Kubernetes API]
+    G -->|humain| I[Approval API]
+    H -->|redémarrage pod| J[Remédiation]
+    J -->|vérification| A
+    I -->|approbation| H
+    B -->|audit| K[(SQLite)]
+    I -->|état| K
+    L[Dashboard] -->|visualisation| A & K
+```
 
-## 4. Expected collector logs
+| Composant | Rôle |
+|---|---|
+| **Prometheus** | Collecte des métriques (CPU, RAM, réseau) et alerting |
+| **Loki + Alloy** | Agrégation et expédition des logs Kubernetes |
+| **Collector** | Cœur de l'agent (Python) — détection, diagnostic, décision |
+| **API** | Approbations manuelles et audit (REST) |
+| **SQLite** | Persistance des incidents, approbations, journaux d'audit |
+| **Kubernetes** | Cible de l'orchestration et de la remédiation |
+| **Dashboard** | Supervision des interventions de l'agent |
 
-You should see:
+---
 
-    Target pod: ...
-    Confirmed incidents: 1
-    INCIDENT DETECTED
-    INCIDENT START
-    Loki ...
-    DECISION
-    AUTO_EXECUTE
-    REMEDIATION END
-    outcome=resolved
+## ✨ Fonctionnalités
 
-For a critical incident you should instead see:
+- ✅ **Remédiation de bout en bout** — de l'alerte Prometheus au redémarrage du pod, jusqu'à la vérification post-action.
+- ✅ **État persistant** — SQLite centralise incidents, approbations et journaux d'audit, partagés entre l'API et le collector.
+- ✅ **Throttling intelligent** — évite la répétition d'incidents pour une même dérive soutenue (logique de cooldown).
+- ✅ **Diagnostic Loki-first** — récupère les logs `ERROR`/`WARN`, avec repli sur une corrélation métrique si les logs sont indisponibles.
+- ✅ **Sécurité à deux niveaux** — exécution automatique pour les incidents mineurs, approbation humaine obligatoire pour les actions critiques.
+- ✅ **Base de connaissances extensible** — signatures pour les incidents CPU et mémoire haute, extensible à d'autres catégories (OOM, DiskFull, NetworkTimeout…).
+- ✅ **Service collector dédié** — conteneur Docker indépendant pour une architecture modulaire.
 
-    SUGGEST_TO_HUMAN
-    Human approval required for critical action
+---
 
-and the request should appear in:
+## 🛠️ Stack technique
 
-    GET /api/approvals/pending
+- **Langages :** Python (agent, analyse), Go *(optionnel, modules performants)*, Bash
+- **Conteneurisation :** Docker, Docker Compose, Kubernetes (K3s / Minikube pour les tests)
+- **Observabilité :** Prometheus, Grafana, Loki *(ou ELK Stack)*
+- **CI/CD & Configuration :** GitLab CI, Terraform, Ansible
+- **Gestion de projet :** Jira, Confluence, Git
 
-## 5. Demo thresholds
+---
 
-The supplied demo thresholds are intentionally low:
+## 🚀 Démarrage rapide
 
-    CPU > 70% for 60s
-    MEMORY > 70% for 60s
+### 1. Récupérer le projet
+Copier le contenu de ce dépôt dans votre projet existant. **Ne pas écraser** vos fichiers de dashboard ou de templates.
 
-After the demo, restore production values such as:
+### 2. Définir le pod cible
+Dans `docker-compose.yml` :
 
-    CPU > 90% for 300s
-    MEMORY > 85% for 300s
+```yaml
+environment:
+  TARGET_POD: "my-app-pod"
+  K8S_NAMESPACE: "default"
+```
 
-## 6. Test Kubernetes access from the container
+> Si omis, le collector sélectionne automatiquement le pod avec la plus forte consommation CPU, avec repli sur le premier pod `Running`.
 
-    docker exec monitoring-collector kubectl --kubeconfig /app/kube-config/config get pods -A
+### 3. Lancer la stack
 
-Then test Loki:
+```powershell
+docker compose down
+docker compose build --no-cache
+docker compose up -d
+```
 
-    docker exec monitoring-api python -c "import requests; print(requests.get('http://loki:3100/ready').text)"
+### 4. Vérifier les logs
 
-Test Prometheus:
+```powershell
+docker compose ps
+docker logs -f monitoring-collector
+```
 
-    docker exec monitoring-collector python -c "import requests; print(requests.get('http://prometheus:9090/-/ready').text)"
+**Sortie attendue :**
 
-## 7. Loki / Alloy
+```text
+Target pod: my-app-pod
+Confirmed incidents: 1
+INCIDENT DETECTED
+INCIDENT START
+Loki query: {pod="my-app-pod"} |= "ERROR"
+DECISION: AUTO_EXECUTE
+REMEDIATION: kubectl delete pod my-app-pod
+REMEDIATION END
+outcome=resolved
+```
 
-The supplied Alloy configuration sends Kubernetes logs to the Docker Compose
-Loki at:
+**Pour un incident critique :**
 
-    http://host.docker.internal:3100/loki/api/v1/push
+```text
+SUGGEST_TO_HUMAN
+Human approval required for critical action
+→ GET /api/approvals/pending
+```
 
-This assumes Minikube is running with Docker Desktop and can resolve
-`host.docker.internal`.
+---
 
-If your Minikube environment cannot resolve it, use a reachable host IP or
-NodePort instead and update `alloy/alloy-values.yaml`.
+## ⚙️ Configuration
 
-## 8. IMPORTANT security note
+### Seuils (valeurs de démo)
 
-Your public GitHub repository currently contains `kube-docker-config.yaml` with
-embedded client certificate/private-key material. Treat that credential as
-exposed. Do not keep it in a public repository.
+| Métrique | Seuil | Durée |
+|---|---|---|
+| CPU | > 70 % | 60 s |
+| Mémoire | > 70 % | 60 s |
 
-Generate a fresh kubeconfig/credential, remove the old key from the public repo,
-and use a secret or local ignored file.
+> Après la démo, restaurer des valeurs de production (ex : CPU > 90 % pendant 300 s), conformément aux critères d'acceptation du backlog (US 1.2).
 
-## 9. Why the old pipeline did not heal
+### Variables d'environnement
 
-The repository had several independent blockers:
-- collector called `check_metrics()` instead of `check_and_confirm()`;
-- compose did not start a collector process;
-- Prometheus URL in compose was missing `/api/v1/query`;
-- `PROMETHEUS_REQUIRE_AUTH` defaulted to true without a token in compose;
-- `get_highest_cpu_pod()` returns `namespace/pod`, while Loki expected only pod;
-- Kubernetes pod remediation executor returned "non implemente";
-- `dry_run` defaulted to true;
-- audit/approval state was in process memory, so API and collector could not
-  reliably share approval state;
-- the remediation knowledge base did not contain CPU/high-memory signatures;
-- sustained threshold alerts could be emitted repeatedly.
+| Variable | Défaut | Description |
+|---|---|---|
+| `TARGET_POD` | *(auto-détection)* | Nom du pod à surveiller |
+| `K8S_NAMESPACE` | `default` | Namespace Kubernetes |
+| `PROMETHEUS_URL` | `http://prometheus:9090/api/v1/query` | Endpoint API Prometheus |
+| `LOKI_URL` | `http://loki:3100` | URL de base Loki |
+| `DRY_RUN` | `false` | `true` pour simuler la remédiation sans exécution réelle |
+| `PROMETHEUS_REQUIRE_AUTH` | `false` | Désactiver pour les tests locaux |
 
-This bundle addresses those blockers without redesigning your dashboard.
+---
+
+## 📈 Requêtes de supervision
+
+**1. Usage CPU (30 dernières minutes)**
+```promql
+avg(rate(container_cpu_usage_seconds_total{pod="my-app-pod"}[5m])) by (pod)
+```
+
+**2. Usage mémoire vs seuil**
+```promql
+container_memory_working_set_bytes{pod="my-app-pod"} / container_spec_memory_limit_bytes * 100
+```
+
+**3. Nombre d'incidents dans le temps**
+```promql
+increase(incidents_total[1h])
+```
+
+**4. Logs d'erreur (LogQL)**
+```logql
+{pod="my-app-pod"} |= "ERROR" | json | line_format "{{.message}}"
+```
+
+---
+
+## 🔒 Sécurité
+
+> ⚠️ **CRITIQUE :** si votre dépôt public contient un fichier `kube-docker-config.yaml` avec des certificats client et des clés privées embarqués, ce credential doit être considéré comme compromis.
+
+**Actions requises :**
+1. Générer un nouveau kubeconfig / credential.
+2. Supprimer l'ancienne clé de l'historique Git (`git filter-repo` ou équivalent — une réécriture d'historique standard ne suffit pas).
+3. Stocker le nouveau credential en tant que secret (Kubernetes Secret, Vault, etc.) ou dans un fichier local ignoré par Git.
+
+### Test de connectivité
+
+```bash
+# Accès Kubernetes
+docker exec monitoring-collector kubectl --kubeconfig /app/kube-config/config get pods -A
+
+# Disponibilité Loki
+docker exec monitoring-api python -c "import requests; print(requests.get('http://loki:3100/ready').text)"
+
+# Disponibilité Prometheus
+docker exec monitoring-collector python -c "import requests; print(requests.get('http://prometheus:9090/-/ready').text)"
+```
+
+---
+
+## 🔧 Dépannage
+
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| Logs collector : `check_metrics() not found` | Mauvais appel de fonction | Utiliser `check_and_confirm()` |
+| Aucun incident déclenché | URL Prometheus sans `/api/v1/query` | Corriger `PROMETHEUS_URL` |
+| Loki retourne vide | Alloy ne transmet pas les logs | Vérifier la config Alloy et la connectivité réseau |
+| Le redémarrage du pod échoue | `DRY_RUN` actif ou permissions manquantes | Passer `DRY_RUN=false` et vérifier le RBAC |
+| Alertes répétées toutes les 30s | Logique de cooldown absente | Doit être corrigé dans cette version |
+
+---
+
+## 📋 Backlog fonctionnel
+
+### Epic 1 — Collecte de données et détection d'anomalies *(Sprint 1)*
+- **US 1.1 — Connexion aux sources de monitoring** : authentification à l'API Prometheus, récupération CPU/RAM/réseau toutes les 30 s, journalisation des erreurs de connexion en `ERROR`.
+- **US 1.2 — Détection des seuils critiques** : seuils configurables via YAML, génération d'un événement JSON incluant service, pod et valeur de métrique.
+
+### Epic 2 — Diagnostic et analyse des logs *(Sprint 2)*
+- **US 2.1 — Agrégation des logs contextuels** : récupération des 500 dernières lignes filtrées sur `WARN`/`ERROR`/`FATAL`, en moins de 5 secondes.
+- **US 2.2 — Identification de la cause racine** : catégorisation de l'erreur (OutOfMemory, DiskFull, NetworkTimeout…) avec score de confiance ; escalade humaine si confiance < 80 %.
+
+### Epic 3 — Remédiation automatisée *(Sprint 3)*
+- **US 3.1 — Exécution de scripts d'auto-réparation** : commandes Kubernetes et playbooks Ansible, avec timeout strict (ex. 2 min).
+- **US 3.2 — Vérification post-remédiation** : re-contrôle Prometheus après un délai configurable ; escalade Slack/Teams si le problème persiste.
+
+### Epic 4 — Supervision et reporting *(Sprint 4)*
+- **US 4.1 — Tableau de bord des interventions** : incidents détectés/résolus/escaladés, historique horodaté, accès web sécurisé.
+- **US 4.2 — Mode d'approbation manuelle (Dry-Run)** : notification Slack/Email avec boutons Approuver/Rejeter ; exécution conditionnée à l'approbation.
+
+---
+
+## ⚠️ Risques identifiés et mesures correctives
+
+| # | Risque | Impact | Mesure corrective |
+|---|---|---|---|
+| 1 | **Boucle de redémarrage infinie** (CrashLoopBackOff) sur une mauvaise configuration | Surcharge de l'API Kubernetes | Rate limiting par pod : arrêt des tentatives automatiques après 3 redémarrages en 15 min, puis escalade humaine |
+| 2 | **Faux positifs lors de pics de charge légitimes** (ex. campagne marketing) | Interruption de service injustifiée | Analyse de tendance (comparaison historique) et fenêtres de maintenance configurables mettant l'agent en pause |
+| 3 | **Perte de connexion à l'API Kubernetes** | Erreurs en cascade, remédiation impossible | Retry exponentiel (backoff) ; alerte « Agent Offline » via canal secondaire si la perte dépasse 5 minutes |
+
+---
+
+## 📦 Livrables
+
+- Code source de l'Agent DevOps Autonome, documenté et versionné.
+- Scripts de remédiation (playbooks Ansible / scripts Python-Bash).
+- Fichiers de configuration Kubernetes (manifests / charts Helm).
+- Tableau de bord de supervision (Grafana ou application web légère).
+- Documentation technique et guide d'utilisation.
+
+---
+
+## 🗓️ Planning prévisionnel
+
+| Sprint | Période |
+|---|---|
+| Sprint 1 (S1–S2) | 1 – 14 juillet 2026 |
+| Sprint 2 (S3–S4) | 15 – 28 juillet 2026 |
+| Sprint 3 (S5–S6) | 29 juillet – 11 août 2026 |
+| Sprint 4 (S7–S8) | 12 – 25 août 2026 |
+
+---
+
+## 🙌 Contribuer
+
+Les pull requests sont les bienvenues. Pour tout changement majeur, merci d'ouvrir une issue au préalable afin de discuter de ce que vous souhaitez modifier.
+
+---
+
+## 📄 Licence
+
+MIT — voir le fichier `LICENSE` pour plus de détails.
+
+---
+
+*Auto-healing, en toute autonomie. 🚀*
