@@ -98,6 +98,27 @@
       K8S_NAMESPACE: default
       REMEDIATION_BACKEND: json
       LOG_LEVEL: DEBUG
+      # ---- Notifications email pour les approbations humaines (US 4.2) ----
+      # SMTP_PASSWORD doit être un "mot de passe d'application" Gmail,
+      # PAS le mot de passe normal du compte (Google le refuse en SMTP direct).
+      # Génère-le sur https://myaccount.google.com/apppasswords
+      # (nécessite la validation en 2 étapes activée sur le compte).
+      SMTP_HOST: smtp.gmail.com
+      SMTP_PORT: "587"
+      SMTP_USE_TLS: "true"
+      SMTP_USER: zarouihiba@gmail.com
+      SMTP_PASSWORD: "uszjqfkfytxywpra"
+      APPROVAL_EMAIL_FROM: zarouihiba@gmail.com
+      APPROVAL_EMAIL_TO: zarouihiba@gmail.com
+      # Empêche scikit-learn/joblib d'utiliser le backend multi-process
+      # "loky" (qui a besoin de /dev/shm) pour entraîner l'IsolationForest.
+      # Sans ça, l'entraînement peut planter le process Python de façon
+      # silencieuse (pas d'exception, juste un crash natif) si /dev/shm
+      # est trop petit dans le conteneur — symptôme typique : "Empty reply
+      # from server" côté client, et rien du tout dans les logs.
+      JOBLIB_MULTIPROCESSING: "0"
+      OMP_NUM_THREADS: "1"
+    shm_size: "512mb"
     volumes:
       - ./data:/app/data
       - ./kube-docker-config.yaml:/app/kube-config/config:ro
