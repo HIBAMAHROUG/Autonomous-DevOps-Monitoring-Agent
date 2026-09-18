@@ -2,7 +2,7 @@ grafana:
   enabled: true
   defaultDashboardsEnabled: true
   adminUser: admin
-  adminPassword: admin12345
+  adminPassword: ""
   additionalDataSources:
     - name: Loki
       type: loki

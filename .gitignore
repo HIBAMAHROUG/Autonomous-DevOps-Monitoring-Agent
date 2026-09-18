@@ -26,6 +26,8 @@ storage/metrics.jsonl
 kube-docker-config.yaml
 .secrets/
 .env
+.env.*
+!.env.example
 
 # Terraform
 terraform/.terraform/

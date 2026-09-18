@@ -7,11 +7,11 @@
     environment:
       DOCKER_INFLUXDB_INIT_MODE: setup
       DOCKER_INFLUXDB_INIT_USERNAME: admin
-      DOCKER_INFLUXDB_INIT_PASSWORD: admin12345
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD:?Set INFLUXDB_INIT_PASSWORD in .env}
       DOCKER_INFLUXDB_INIT_ORG: monitoring
       DOCKER_INFLUXDB_INIT_BUCKET: ai-agent
       DOCKER_INFLUXDB_INIT_RETENTION: 720h0m0s
-      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: monitoring-token
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_INIT_ADMIN_TOKEN:?Set INFLUXDB_INIT_ADMIN_TOKEN in .env}
     volumes:
       - influxdb-data:/var/lib/influxdb2
     restart: unless-stopped
@@ -63,7 +63,7 @@
       - "3000:3000"
     environment:
       GF_SECURITY_ADMIN_USER: admin
-      GF_SECURITY_ADMIN_PASSWORD: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
       GF_AUTH_ANONYMOUS_ENABLED: "true"
       GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
       GF_SECURITY_ALLOW_EMBEDDING: "true"
@@ -84,14 +84,14 @@
       - "5000:5000"
     environment:
       PYTHONUNBUFFERED: "1"
-      API_KEY: "ma-cle-secrete-locale"
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
       PROMETHEUS_URL: http://prometheus:9090
       PROMETHEUS_REQUIRE_AUTH: "false"
       LOKI_URL: http://loki:3100
       INFLUX_URL: http://influxdb:8086
       INFLUX_ORG: monitoring
       INFLUX_BUCKET: ai-agent
-      INFLUX_TOKEN: monitoring-token
+      INFLUX_TOKEN: ${INFLUXDB_INIT_ADMIN_TOKEN:?Set INFLUXDB_INIT_ADMIN_TOKEN in .env}
       AUDIT_BACKEND: sqlite
       AUDIT_DB_PATH: /app/data/audit.sqlite3
       KUBECONFIG: /app/kube-config/config
