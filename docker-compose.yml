@@ -85,7 +85,7 @@
     environment:
       PYTHONUNBUFFERED: "1"
       API_KEY: "ma-cle-secrete-locale"
-      PROMETHEUS_URL: http://prometheus:9090/api/v1/query
+      PROMETHEUS_URL: http://prometheus:9090
       PROMETHEUS_REQUIRE_AUTH: "false"
       LOKI_URL: http://loki:3100
       INFLUX_URL: http://influxdb:8086
@@ -121,44 +121,12 @@
     shm_size: "512mb"
     volumes:
       - ./data:/app/data
-      - ./kube-docker-config.yaml:/app/kube-config/config:ro
+      - ${KUBECONFIG_PATH:-./.secrets/kubeconfig}:/app/kube-config/config:ro
       - ./api:/app/api
       # Nécessaire pour que DockerExecutor puisse exécuter
       # `docker restart <container>` sur les conteneurs de l'hôte
       # depuis l'intérieur de monitoring-api.
       - /var/run/docker.sock:/var/run/docker.sock
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    depends_on:
-      - influxdb
-      - prometheus
-      - loki
-    restart: unless-stopped
-
-  collector:
-    build: .
-    container_name: monitoring-collector
-    command: python -u -m collector.collector
-    environment:
-      PYTHONUNBUFFERED: "1"
-      PROMETHEUS_URL: http://prometheus:9090/api/v1/query
-      PROMETHEUS_REQUIRE_AUTH: "false"
-      LOKI_URL: http://loki:3100
-      INFLUX_URL: http://influxdb:8086
-      INFLUX_ORG: monitoring
-      INFLUX_BUCKET: ai-agent
-      INFLUX_TOKEN: monitoring-token
-      AUDIT_BACKEND: sqlite
-      AUDIT_DB_PATH: /app/data/audit.sqlite3
-      KUBECONFIG: /app/kube-config/config
-      K8S_NAMESPACE: default
-      REMEDIATION_BACKEND: json
-      AUTO_REMEDIATION_ENABLED: "true"
-      DRY_RUN: "false"
-      COLLECTION_INTERVAL_SECONDS: "30"
-    volumes:
-      - ./data:/app/data
-      - ./kube-docker-config.yaml:/app/kube-config/config:ro
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

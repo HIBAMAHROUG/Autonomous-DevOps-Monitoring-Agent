@@ -36,8 +36,9 @@ POLL_INTERVAL_SECONDS = int(os.getenv("MONITOR_POLL_INTERVAL_SECONDS", "30"))
 # Nom logique du service/pod surveillé par cette boucle. À remplacer par
 # un vrai nom de deployment Kubernetes si tu veux que ACT-SCALE-OUT /
 # ACT-RESTART-POD agissent sur une charge de travail réelle.
-MONITORED_SERVICE = os.getenv("MONITOR_SERVICE_NAME", "host-monitor")
-MONITORED_POD = os.getenv("MONITOR_POD_NAME", "host-monitor")
+MONITORED_SERVICE = os.getenv("MONITOR_SERVICE_NAME", "infrastructure")
+MONITORED_POD = os.getenv("MONITOR_POD_NAME")
+MONITORED_NAMESPACE = os.getenv("K8S_NAMESPACE", "default")
 
 # Anti-spam : une fois un incident déclenché, on laisse ce délai avant de
 # pouvoir en déclencher un nouveau pour le même service, même si le
@@ -74,10 +75,16 @@ _last_incident_at: float | None = None
 _stop_event = threading.Event()
 
 
+def _prometheus_query_url() -> str:
+    """Accept either a Prometheus base URL or its query endpoint."""
+    base_url = PROMETHEUS_URL.rstrip("/")
+    return base_url if base_url.endswith("/api/v1/query") else f"{base_url}/api/v1/query"
+
+
 def _query_prometheus(expr: str) -> float | None:
     try:
         response = requests.get(
-            f"{PROMETHEUS_URL}/api/v1/query",
+            _prometheus_query_url(),
             params={"query": expr},
             timeout=5,
         )
@@ -102,6 +109,35 @@ def _query_prometheus(expr: str) -> float | None:
     ) as exc:
         logger.warning("monitor_loop: échec requête Prometheus: %s", exc)
         return None
+
+
+def _resolve_target_pod() -> tuple[str | None, str]:
+    """Resolve the busiest pod so node alerts can trigger a pod action."""
+    if MONITORED_POD:
+        return MONITORED_POD, MONITORED_NAMESPACE
+
+    query = (
+        "topk(1, sum by (namespace, pod) ("
+        'rate(container_cpu_usage_seconds_total{pod!="",container!="",'
+        'container!="POD"}[5m])))'
+    )
+    try:
+        response = requests.get(
+            _prometheus_query_url(),
+            params={"query": query},
+            timeout=5,
+        )
+        response.raise_for_status()
+        result = response.json().get("data", {}).get("result", [])
+        if result:
+            labels = result[0].get("metric", {})
+            pod = labels.get("pod")
+            if pod:
+                return pod, labels.get("namespace", MONITORED_NAMESPACE)
+    except (requests.RequestException, ValueError, TypeError, KeyError):
+        logger.warning("monitor_loop: impossible de résoudre le pod cible")
+
+    return None, MONITORED_NAMESPACE
 
 
 def _collect_metrics() -> dict[str, float] | None:
@@ -150,10 +186,11 @@ def _run_cycle() -> None:
     check_and_confirm(metrics, service=MONITORED_SERVICE)
 
     now = datetime.now(timezone.utc)
+    target_pod, target_namespace = _resolve_target_pod()
     threshold_alerts = _default_detector.check(
         metrics,
         service=MONITORED_SERVICE,
-        pod=MONITORED_POD,
+        pod=target_pod,
         now=now,
     )
 
@@ -203,7 +240,12 @@ def _run_cycle() -> None:
         # une détection automatique en continu doit pouvoir agir pour
         # de vrai. Mets à True si tu veux d'abord observer sans risque
         # avant d'activer l'exécution réelle.
-        handle_alert(alert, pod=MONITORED_POD, dry_run=False)
+        handle_alert(
+            alert,
+            pod=target_pod,
+            namespace=target_namespace,
+            dry_run=False,
+        )
     except Exception as exc:
         logger.exception("monitor_loop: échec handle_alert: %s", exc)
     finally:

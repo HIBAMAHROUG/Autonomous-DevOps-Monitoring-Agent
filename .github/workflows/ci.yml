@@ -24,6 +24,11 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Scan repository for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
