@@ -1,0 +1,17 @@
+[
+    {
+        "timestamp": "2026-01-01T00:05:00+00:00",
+        "service": "svc-a",
+        "pod": null,
+        "metric": "CPU",
+        "metric_key": "cpu",
+        "value": 95.0,
+        "threshold": 90.0,
+        "baseline": 30,
+        "trend_multiplier": 1.5,
+        "sustained_seconds": 300.0,
+        "required_duration": 300.0,
+        "severity": "medium",
+        "maintenance_window": null
+    }
+]

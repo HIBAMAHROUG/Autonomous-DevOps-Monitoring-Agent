@@ -1,0 +1,1999 @@
+﻿<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Autonomous DevOps Agent | Smartovate Ltd</title>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+:root {
+    --bg: #0a0a12;
+    --bg-panel: #0f0f1a;
+    --bg-card: #131322;
+    --bg-card-hover: #1a1a30;
+    --border: rgba(100, 180, 255, 0.08);
+    --border-glow: rgba(100, 180, 255, 0.15);
+    --text: #e8eeff;
+    --text-dim: #5a6a8a;
+    --text-muted: #3a4a6a;
+    --cyan: #00d4ff;
+    --cyan-dim: rgba(0, 212, 255, 0.10);
+    --purple: #a855f7;
+    --purple-dim: rgba(168, 85, 247, 0.10);
+    --pink: #ec4899;
+    --green: #22d3a7;
+    --green-dim: rgba(34, 211, 167, 0.08);
+    --orange: #f59e0b;
+    --red: #f87171;
+    --shadow: 0 20px 60px rgba(0, 0, 0, 0.8);
+    --radius: 12px;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    line-height: 1.5;
+    overflow-x: hidden;
+}
+
+body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        linear-gradient(rgba(100, 180, 255, 0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(100, 180, 255, 0.02) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+}
+
+::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--cyan);
+    border-radius: 10px;
+}
+
+.sidebar {
+    width: 240px;
+    height: 100vh;
+    position: fixed;
+    left: 0;
+    top: 0;
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    padding: 24px 16px;
+    overflow-y: auto;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+}
+
+.brand {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 20px;
+}
+
+.logo {
+    width: 42px;
+    height: 42px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    box-shadow: 0 0 30px rgba(0, 212, 255, 0.15);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 800;
+    font-size: 16px;
+    color: #fff;
+    flex-shrink: 0;
+}
+
+.brand-text strong {
+    display: block;
+    font-size: 13px;
+    font-weight: 700;
+    background: linear-gradient(90deg, #fff, var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.brand-text span {
+    display: block;
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+}
+
+.company {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+    margin-bottom: 20px;
+}
+
+.company-name {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--cyan);
+}
+
+.company-sub {
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+}
+
+.nav-title {
+    font-size: 8px;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 700;
+    margin: 16px 8px 8px;
+}
+
+.nav a {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-dim);
+    text-decoration: none;
+    font-size: 12px;
+    font-weight: 500;
+    transition: all 0.25s ease;
+    margin: 1px 0;
+    border-left: 2px solid transparent;
+}
+
+.nav a:hover,
+.nav a.active {
+    background: rgba(0, 212, 255, 0.06);
+    color: #fff;
+    border-left-color: var(--cyan);
+}
+
+.nav-icon {
+    width: 18px;
+    text-align: center;
+    font-size: 13px;
+    opacity: 0.7;
+}
+
+.main {
+    margin-left: 240px;
+    padding: 20px 28px 40px;
+    min-height: 100vh;
+    position: relative;
+    z-index: 1;
+}
+
+.topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.eyebrow {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    color: var(--cyan);
+    text-transform: uppercase;
+    letter-spacing: 2.5px;
+    font-weight: 600;
+}
+
+.topbar h1 {
+    font-size: 26px;
+    font-weight: 800;
+    letter-spacing: -0.8px;
+    margin: 2px 0;
+    background: linear-gradient(90deg, #fff 50%, var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.subtitle {
+    font-size: 11px;
+    color: var(--text-dim);
+}
+
+.top-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.online {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px;
+    border: 1px solid var(--border-glow);
+    border-radius: 8px;
+    background: rgba(0, 212, 255, 0.03);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    color: var(--cyan);
+}
+
+.dot {
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--cyan);
+    animation: pulse-dot 2s infinite;
+}
+
+@keyframes pulse-dot {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: .4; transform: scale(.7); }
+}
+
+.refresh-btn,
+.primary {
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    color: var(--text-dim);
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 10px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.refresh-btn:hover {
+    border-color: var(--cyan);
+    color: #fff;
+}
+
+.primary {
+    background: linear-gradient(135deg, var(--cyan), var(--purple));
+    border: none;
+    color: #0a0a12;
+    font-weight: 700;
+}
+
+.connection {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    margin-bottom: 22px;
+    border: 1px solid var(--border);
+    background: var(--bg-card);
+    border-radius: var(--radius);
+}
+
+.key {
+    flex: 1;
+    min-width: 180px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: #e8eeff;
+    padding: 9px 14px;
+    border-radius: 8px;
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    outline: none;
+}
+
+.key:focus {
+    border-color: var(--cyan);
+}
+
+.conn-meta {
+    font-size: 9px;
+    color: var(--text-dim);
+    white-space: nowrap;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.conn-meta b {
+    color: var(--cyan);
+}
+
+.section-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin: 28px 0 12px;
+    padding-bottom: 6px;
+    border-bottom: 1px solid var(--border);
+}
+
+.section-title h2 {
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+}
+
+.section-title span {
+    font-size: 8px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    transition: all .3s ease;
+}
+
+.card:hover {
+    border-color: var(--border-glow);
+    background: var(--bg-card-hover);
+}
+
+.grid4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+}
+
+.metric-card {
+    position: relative;
+}
+
+.metric-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.metric-name {
+    font-size: 9px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1.2px;
+    font-weight: 600;
+}
+
+.metric-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 212, 255, .04);
+    color: var(--cyan);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    border: 1px solid var(--border);
+}
+
+.metric-value {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -1.5px;
+    margin: 10px 0 4px;
+    background: linear-gradient(90deg, #fff 40%, var(--cyan));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.metric-foot {
+    font-size: 8px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.bar,
+.purple-bar {
+    height: 3px;
+    background: #1a1a30;
+    border-radius: 10px;
+    margin-top: 12px;
+    overflow: hidden;
+}
+
+.bar i,
+.purple-bar i {
+    display: block;
+    height: 100%;
+    width: 0;
+    border-radius: 10px;
+    transition: width .8s ease;
+}
+
+.bar i {
+    background: linear-gradient(90deg, var(--cyan), var(--purple));
+}
+
+.purple-bar i {
+    background: linear-gradient(90deg, var(--purple), var(--pink));
+}
+
+.health-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+}
+
+.health {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.health-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: rgba(0, 212, 255, .04);
+    color: var(--cyan);
+    border: 1px solid var(--border);
+}
+
+.health h3 {
+    font-size: 11px;
+}
+
+.health p {
+    font-size: 8px;
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.status {
+    margin-left: auto;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 6px;
+}
+
+.status.up {
+    color: var(--green);
+    background: var(--green-dim);
+}
+
+.status.down {
+    color: var(--red);
+    background: rgba(248, 113, 113, .06);
+}
+
+.status.unknown {
+    color: var(--orange);
+    background: rgba(245, 158, 11, .06);
+}
+
+.ai-grid {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr 1fr;
+    gap: 12px;
+}
+
+.ai-card {
+    min-height: 130px;
+}
+
+.ai-label {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    color: var(--purple);
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    font-weight: 700;
+}
+
+.ai-card .big {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 32px;
+    font-weight: 700;
+    margin-top: 12px;
+    background: linear-gradient(135deg, #fff 30%, var(--purple));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.ai-desc {
+    font-size: 8px;
+    color: var(--text-dim);
+    margin-top: 3px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.table-wrap {
+    overflow: auto;
+    padding: 0;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+}
+
+th {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text-muted);
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border);
+}
+
+td {
+    font-size: 10px;
+    color: #b8c8e8;
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(100,180,255,.03);
+}
+
+.badge {
+    display: inline-flex;
+    padding: 2px 10px;
+    border-radius: 5px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 7px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.badge.resolved {
+    color: var(--green);
+    background: var(--green-dim);
+}
+
+.badge.failed {
+    color: var(--red);
+    background: rgba(248,113,113,.06);
+}
+
+.badge.escalated {
+    color: var(--orange);
+    background: rgba(245,158,11,.06);
+}
+
+.badge.pending {
+    color: var(--purple);
+    background: var(--purple-dim);
+}
+
+.approvals {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.approval {
+    border: 1px solid rgba(245,158,11,.08);
+    background: rgba(245,158,11,.02);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+
+.approval-top {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+
+.approval-action {
+    font-size: 11px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.approval-meta,
+.approval-reason {
+    font-size: 8px;
+    color: var(--text-dim);
+    margin-top: 4px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.approval-buttons {
+    display: flex;
+    gap: 6px;
+    margin-top: 8px;
+}
+
+.approve,
+.reject {
+    border-radius: 6px;
+    padding: 5px 12px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+    font-weight: 700;
+    cursor: pointer;
+}
+
+.approve {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(34,211,167,.1);
+}
+
+.reject {
+    background: rgba(248,113,113,.06);
+    color: var(--red);
+    border: 1px solid rgba(248,113,113,.1);
+}
+
+.empty {
+    color: var(--text-muted);
+    text-align: center;
+    padding: 24px;
+    font-size: 10px;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+.footer {
+    display: flex;
+    justify-content: space-between;
+    color: var(--text-muted);
+    font-size: 8px;
+    font-family: 'JetBrains Mono', monospace;
+    margin-top: 28px;
+    padding: 14px 2px;
+    border-top: 1px solid var(--border);
+}
+
+#toast {
+    position: fixed;
+    right: 24px;
+    bottom: 24px;
+    z-index: 200;
+    background: var(--bg-card);
+    border: 1px solid var(--border-glow);
+    padding: 12px 18px;
+    border-radius: 10px;
+    font-size: 10px;
+    box-shadow: var(--shadow);
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+    transition: all .3s ease;
+    font-family: 'JetBrains Mono', monospace;
+}
+
+#toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+#toast.error {
+    border-color: rgba(248,113,113,.3);
+}
+
+.loading {
+    opacity: .6;
+    pointer-events: none;
+}
+
+@media (max-width: 1100px) {
+    .grid4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .ai-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 850px) {
+    .sidebar {
+        width: 60px;
+        padding: 16px 10px;
+    }
+
+    .brand-text,
+    .company,
+    .nav-title,
+    .nav a span:not(.nav-icon) {
+        display: none;
+    }
+
+    .brand {
+        justify-content: center;
+    }
+
+    .nav a {
+        justify-content: center;
+    }
+
+    .main {
+        margin-left: 60px;
+        padding: 16px;
+    }
+
+    .health-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 600px) {
+    .grid4,
+    .ai-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .main {
+        padding: 12px;
+    }
+}
+
+@media (max-width: 480px) {
+    .sidebar {
+        display: none;
+    }
+
+    .main {
+        margin-left: 0;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="app">
+
+<aside class="sidebar">
+
+    <div class="brand">
+        <div class="logo">AI</div>
+        <div class="brand-text">
+            <strong>Autonomous Agent</strong>
+            <span>DevOps Intelligence</span>
+        </div>
+    </div>
+
+    <div class="company">
+        <div class="company-name">SMARTOVATE LTD</div>
+        <div class="company-sub">Cloud &amp; DevOps Solutions</div>
+    </div>
+
+    <div class="nav-title">Platform</div>
+
+    <nav class="nav">
+        <a class="active" href="#overview">
+            <span class="nav-icon">◈</span>
+            <span>Overview</span>
+        </a>
+
+        <a href="#monitoring">
+            <span class="nav-icon">◉</span>
+            <span>Monitoring</span>
+        </a>
+
+        <a href="#ai">
+            <span class="nav-icon">✦</span>
+            <span>AI Engine</span>
+        </a>
+
+        <a href="#incidents">
+            <span class="nav-icon">⚠</span>
+            <span>Incidents</span>
+        </a>
+
+        <a href="#approvals">
+            <span class="nav-icon">✓</span>
+            <span>Approvals</span>
+        </a>
+
+        <a href="#history">
+            <span class="nav-icon">◷</span>
+            <span>History</span>
+        </a>
+    </nav>
+
+    <div class="nav-title">Stack</div>
+
+    <nav class="nav">
+        <a href="#monitoring">
+            <span class="nav-icon">P</span>
+            <span>Prometheus</span>
+        </a>
+
+        <a href="#monitoring">
+            <span class="nav-icon">L</span>
+            <span>Loki</span>
+        </a>
+
+        <a href="#monitoring">
+            <span class="nav-icon">K</span>
+            <span>Kubernetes</span>
+        </a>
+    </nav>
+
+</aside>
+
+<main class="main">
+
+<header class="topbar" id="overview">
+
+    <div>
+        <div class="eyebrow">
+            Smartovate Ltd · Autonomous Operations
+        </div>
+
+        <h1>DevOps Monitoring Center</h1>
+
+        <div class="subtitle">
+            Real-time infrastructure intelligence, incident detection &amp; autonomous remediation
+        </div>
+    </div>
+
+    <div class="top-actions">
+
+        <div class="online">
+            <i class="dot"></i>
+            <span id="connectionText">NOT CONNECTED</span>
+        </div>
+
+        <button class="refresh-btn" onclick="refresh()">
+            ↻ Refresh
+        </button>
+
+    </div>
+
+</header>
+
+<section class="connection">
+
+    <input
+        id="apiKeyInput"
+        class="key"
+        type="password"
+        placeholder="API key"
+        autocomplete="off"
+    >
+
+    <button class="primary" onclick="connectDashboard()">
+        Connect
+    </button>
+
+    <div class="conn-meta">
+        Source: <b>Prometheus</b>
+    </div>
+
+    <div class="conn-meta">
+        Refresh: <b>30s</b>
+    </div>
+
+    <div class="conn-meta">
+        Last update: <b id="lastUpdate">—</b>
+    </div>
+
+</section>
+
+<div class="section-title" id="monitoring">
+    <h2>Infrastructure Overview</h2>
+    <span>Prometheus metrics</span>
+</div>
+
+<section class="grid4">
+
+    <div class="card metric-card">
+        <div class="metric-head">
+            <div class="metric-name">CPU Usage</div>
+            <div class="metric-icon">CPU</div>
+        </div>
+
+        <div class="metric-value" id="infraCpu">—</div>
+
+        <div class="metric-foot">
+            5-minute average · node exporter
+        </div>
+
+        <div class="bar">
+            <i id="cpuBar"></i>
+        </div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-head">
+            <div class="metric-name">Memory</div>
+            <div class="metric-icon">RAM</div>
+        </div>
+
+        <div class="metric-value" id="infraMem">—</div>
+
+        <div class="metric-foot">
+            Used memory percentage
+        </div>
+
+        <div class="bar">
+            <i id="memBar"></i>
+        </div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-head">
+            <div class="metric-name">Network RX</div>
+            <div class="metric-icon">↓</div>
+        </div>
+
+        <div class="metric-value" id="infraRx">—</div>
+
+        <div class="metric-foot">
+            Receive rate · loopback excluded
+        </div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-head">
+            <div class="metric-name">Network TX</div>
+            <div class="metric-icon">↑</div>
+        </div>
+
+        <div class="metric-value" id="infraTx">—</div>
+
+        <div class="metric-foot">
+            Transmit rate · loopback excluded
+        </div>
+    </div>
+
+</section>
+
+<div class="section-title">
+    <h2>System Health</h2>
+    <span>Live services</span>
+</div>
+
+<section class="health-grid">
+
+    <div class="card health">
+        <div class="health-icon">P</div>
+
+        <div>
+            <h3>Prometheus</h3>
+            <p>Metrics collection &amp; queries</p>
+        </div>
+
+        <div id="promStatus" class="status unknown">
+            UNKNOWN
+        </div>
+    </div>
+
+    <div class="card health">
+        <div class="health-icon">N</div>
+
+        <div>
+            <h3>Node Exporter</h3>
+            <p>Host infrastructure metrics</p>
+        </div>
+
+        <div id="nodeStatus" class="status unknown">
+            UNKNOWN
+        </div>
+    </div>
+
+    <div class="card health">
+        <div class="health-icon">A</div>
+
+        <div>
+            <h3>Monitoring API</h3>
+            <p>Agent dashboard backend</p>
+        </div>
+
+        <div id="apiStatus" class="status unknown">
+            UNKNOWN
+        </div>
+    </div>
+
+</section>
+
+<div class="section-title" id="ai">
+    <h2>Autonomous Intelligence</h2>
+    <span>Decision engine</span>
+</div>
+
+<section class="ai-grid">
+
+    <div class="card ai-card">
+
+        <div class="ai-label">
+            Self-Healing Rate
+        </div>
+
+        <div class="big" id="selfHealingRatio">
+            —
+        </div>
+
+        <div class="ai-desc">
+            Incidents resolved automatically
+        </div>
+
+        <div class="purple-bar">
+            <i id="healingBar"></i>
+        </div>
+
+    </div>
+
+    <div class="card ai-card">
+
+        <div class="ai-label">
+            Average MTTR
+        </div>
+
+        <div class="big" id="avgMttr">
+            —
+        </div>
+
+        <div class="ai-desc">
+            Mean time to resolution
+        </div>
+
+    </div>
+
+    <div class="card ai-card">
+
+        <div class="ai-label">
+            Tracked Incidents
+        </div>
+
+        <div class="big" id="totalIncidents">
+            —
+        </div>
+
+        <div class="ai-desc">
+            Incidents measured by the agent
+        </div>
+
+    </div>
+
+</section>
+
+<div class="section-title" id="incidents">
+    <h2>Incident Operations</h2>
+    <span>Agent activity</span>
+</div>
+
+<section class="grid4">
+
+    <div class="card metric-card">
+        <div class="metric-name">Detected</div>
+        <div class="metric-value" id="countDetected">0</div>
+        <div class="metric-foot">Detected incidents</div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-name">Resolved</div>
+        <div class="metric-value" id="countResolved">0</div>
+        <div class="metric-foot">Successful remediation</div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-name">Escalated</div>
+        <div class="metric-value" id="countEscalated">0</div>
+        <div class="metric-foot">Human intervention</div>
+    </div>
+
+    <div class="card metric-card">
+        <div class="metric-name">Failed</div>
+        <div class="metric-value" id="countFailed">0</div>
+        <div class="metric-foot">Unresolved actions</div>
+    </div>
+
+</section>
+
+<div class="section-title" id="approvals">
+    <h2>Human Approvals</h2>
+    <span>Critical actions</span>
+</div>
+
+<section class="card">
+
+    <div id="approvalsList" class="approvals">
+        <div class="empty">
+            Aucune action en attente.
+        </div>
+    </div>
+
+</section>
+
+<div class="section-title">
+    <h2>AI Decisions</h2>
+    <span>Latest decisions</span>
+</div>
+
+<section class="card table-wrap">
+
+<table>
+
+<thead>
+<tr>
+    <th>Time</th>
+    <th>Mode</th>
+    <th>Confidence</th>
+    <th>Action</th>
+    <th>Outcome</th>
+    <th>Reason</th>
+</tr>
+</thead>
+
+<tbody id="decisionsBody">
+<tr>
+    <td colspan="6" class="empty">
+        Aucune décision disponible.
+    </td>
+</tr>
+</tbody>
+
+</table>
+
+</section>
+
+<div class="section-title" id="history">
+    <h2>Intervention History</h2>
+    <span>Audit trail</span>
+</div>
+
+<section class="card table-wrap">
+
+<table>
+
+<thead>
+<tr>
+    <th>Time</th>
+    <th>Action ID</th>
+    <th>Status</th>
+    <th>Message</th>
+</tr>
+</thead>
+
+<tbody id="historyBody">
+<tr>
+    <td colspan="4" class="empty">
+        Aucune intervention journalisée.
+    </td>
+</tr>
+</tbody>
+
+</table>
+
+</section>
+
+<footer class="footer">
+    <span>Autonomous DevOps Monitoring Agent</span>
+    <span>Smartovate Ltd · Infrastructure Intelligence</span>
+</footer>
+
+</main>
+</div>
+
+<div id="toast"></div>
+
+<script>
+
+const REFRESH_INTERVAL = 30;
+
+let apiKey = null;
+let refreshTimer = null;
+
+
+/* ============================================================
+   INIT
+============================================================ */
+
+document.addEventListener("DOMContentLoaded", () => {
+
+    const saved = localStorage.getItem("monitoring_api_key");
+
+    if (saved) {
+        document.getElementById("apiKeyInput").value = saved;
+        connectDashboard(false);
+    }
+
+});
+
+
+/* ============================================================
+   SECURITY / HELPERS
+============================================================ */
+
+function esc(value) {
+
+    const d = document.createElement("div");
+
+    d.textContent = value ?? "—";
+
+    return d.innerHTML;
+}
+
+
+function escapeJs(value) {
+
+    return String(value)
+        .replace(/\\/g, "\\\\")
+        .replace(/'/g, "\\'");
+
+}
+
+
+function toast(message, error = false) {
+
+    const element = document.getElementById("toast");
+
+    element.textContent = message;
+
+    element.className = error
+        ? "show error"
+        : "show";
+
+    clearTimeout(element._timer);
+
+    element._timer = setTimeout(() => {
+        element.className = "";
+    }, 2800);
+
+}
+
+
+/* ============================================================
+   API
+============================================================ */
+
+async function apiGet(path) {
+
+    if (!apiKey) {
+        throw new Error("API key missing");
+    }
+
+    const response = await fetch(path, {
+        method: "GET",
+        headers: {
+            "X-API-Key": apiKey,
+            "Accept": "application/json"
+        },
+        cache: "no-store"
+    });
+
+    if (response.status === 401) {
+        throw new Error("API key incorrecte.");
+    }
+
+    if (!response.ok) {
+        throw new Error("API error " + response.status);
+    }
+
+    return response.json();
+
+}
+
+
+async function apiPost(path, body = null) {
+
+    const options = {
+        method: "POST",
+        headers: {
+            "X-API-Key": apiKey,
+            "Accept": "application/json",
+            "Content-Type": "application/json"
+        }
+    };
+
+    if (body !== null) {
+        options.body = JSON.stringify(body);
+    }
+
+    const response = await fetch(path, options);
+
+    if (response.status === 401) {
+        throw new Error("API key incorrecte.");
+    }
+
+    if (!response.ok) {
+        throw new Error("API error " + response.status);
+    }
+
+    return response.json();
+
+}
+
+
+/* ============================================================
+   STATUS
+============================================================ */
+
+function setStatus(id, value) {
+
+    const element = document.getElementById(id);
+
+    const number = Number(value);
+
+    if (number === 1) {
+
+        element.textContent = "UP";
+        element.className = "status up";
+
+    } else if (value == null) {
+
+        element.textContent = "UNKNOWN";
+        element.className = "status unknown";
+
+    } else {
+
+        element.textContent = "DOWN";
+        element.className = "status down";
+
+    }
+
+}
+
+
+/* ============================================================
+   METRICS
+============================================================ */
+
+function setMetric(id, value, suffix = "") {
+
+    const number = Number(value);
+
+    document.getElementById(id).textContent =
+        Number.isFinite(number)
+            ? number.toFixed(1) + suffix
+            : "—";
+
+}
+
+
+function rate(value) {
+
+    const number = Number(value);
+
+    if (!Number.isFinite(number)) {
+        return "—";
+    }
+
+    if (number >= 1048576) {
+        return (number / 1048576).toFixed(1) + " MB/s";
+    }
+
+    if (number >= 1024) {
+        return (number / 1024).toFixed(1) + " KB/s";
+    }
+
+    return number.toFixed(0) + " B/s";
+
+}
+
+
+/* ============================================================
+   INFRASTRUCTURE
+============================================================ */
+
+function updateInfrastructure(data) {
+
+    const metrics = data.metrics || data;
+
+    const cpu = Number(
+        data.cpu_percent ??
+        metrics.cpu_percent
+    );
+
+    const memory = Number(
+        data.memory_percent ??
+        metrics.memory_percent
+    );
+
+    const rx =
+        data.network_receive_bytes_per_second ??
+        data.network_receive ??
+        metrics.network_receive;
+
+    const tx =
+        data.network_transmit_bytes_per_second ??
+        data.network_transmit ??
+        metrics.network_transmit;
+
+    setMetric("infraCpu", cpu, "%");
+    setMetric("infraMem", memory, "%");
+
+    document.getElementById("infraRx").textContent =
+        rate(rx);
+
+    document.getElementById("infraTx").textContent =
+        rate(tx);
+
+    document.getElementById("cpuBar").style.width =
+        Math.min(100, Math.max(0, cpu || 0)) + "%";
+
+    document.getElementById("memBar").style.width =
+        Math.min(100, Math.max(0, memory || 0)) + "%";
+
+    setStatus(
+        "promStatus",
+        data.prometheus_up ?? metrics.prometheus_up
+    );
+
+    setStatus(
+        "nodeStatus",
+        data.node_exporter_up ?? metrics.node_exporter_up
+    );
+
+    setStatus("apiStatus", 1);
+
+}
+
+
+/* ============================================================
+   SUMMARY
+============================================================ */
+
+function updateSummary(summary) {
+
+    document.getElementById("countDetected").textContent =
+        summary.detected ?? 0;
+
+    document.getElementById("countResolved").textContent =
+        summary.resolved ?? 0;
+
+    document.getElementById("countEscalated").textContent =
+        summary.escalated ?? 0;
+
+    document.getElementById("countFailed").textContent =
+        summary.failed ?? 0;
+
+    document.getElementById("totalIncidents").textContent =
+        summary.total_incidents ?? 0;
+
+    const rateValue =
+        Number(summary.auto_resolution_rate ?? 0);
+
+    const percentage =
+        rateValue <= 1
+            ? rateValue * 100
+            : rateValue;
+
+    document.getElementById("selfHealingRatio").textContent =
+        percentage.toFixed(0) + "%";
+
+    document.getElementById("healingBar").style.width =
+        Math.min(100, Math.max(0, percentage)) + "%";
+
+    document.getElementById("avgMttr").textContent =
+        Number(summary.mttr_seconds_avg ?? 0).toFixed(1) + " s";
+
+}
+
+
+/* ============================================================
+   NORMALIZE STATUS
+============================================================ */
+
+function normalizeStatus(value) {
+
+    const text =
+        String(value || "pending").toLowerCase();
+
+    if (
+        text.includes("resolve") ||
+        text === "success" ||
+        text === "succeeded"
+    ) {
+        return "resolved";
+    }
+
+    if (text.includes("escalat")) {
+        return "escalated";
+    }
+
+    if (text.includes("fail")) {
+        return "failed";
+    }
+
+    return "pending";
+
+}
+
+
+/* ============================================================
+   DATE
+============================================================ */
+
+function formatDate(value) {
+
+    if (!value) {
+        return "—";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return String(value);
+    }
+
+    return date.toLocaleString("fr-FR");
+
+}
+
+
+/* ============================================================
+   DECISIONS
+============================================================ */
+
+function updateDecisions(data) {
+
+    const list =
+        Array.isArray(data)
+            ? data
+            : (Array.isArray(data.recent)
+                ? data.recent
+                : []);
+
+    const body =
+        document.getElementById("decisionsBody");
+
+    if (!list.length) {
+
+        body.innerHTML = `
+            <tr>
+                <td colspan="6" class="empty">
+                    Aucune décision disponible.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    body.innerHTML = "";
+
+    list.forEach(item => {
+
+        const confidence =
+            Number(item.confidence);
+
+        const percentage =
+            Number.isFinite(confidence)
+                ? (confidence <= 1
+                    ? confidence * 100
+                    : confidence)
+                : null;
+
+        const outcome =
+            normalizeStatus(item.outcome);
+
+        body.innerHTML += `
+            <tr>
+
+                <td>
+                    ${esc(formatDate(item.timestamp))}
+                </td>
+
+                <td>
+                    ${esc(item.mode || "—")}
+                </td>
+
+                <td>
+                    ${
+                        percentage === null
+                            ? "—"
+                            : percentage.toFixed(0) + "%"
+                    }
+                </td>
+
+                <td>
+                    ${esc(
+                        item.action_type ||
+                        item.action ||
+                        "—"
+                    )}
+                </td>
+
+                <td>
+                    <span class="badge ${outcome}">
+                        ${esc(outcome)}
+                    </span>
+                </td>
+
+                <td>
+                    ${esc(item.reason || "—")}
+                </td>
+
+            </tr>
+        `;
+
+    });
+
+}
+
+
+/* ============================================================
+   APPROVALS
+============================================================ */
+
+function updateApprovals(data) {
+
+    const list =
+        Array.isArray(data)
+            ? data
+            : (
+                Array.isArray(data.pending)
+                    ? data.pending
+                    : (
+                        Array.isArray(data.approvals)
+                            ? data.approvals
+                            : []
+                    )
+            );
+
+    const container =
+        document.getElementById("approvalsList");
+
+    if (!list.length) {
+
+        container.innerHTML = `
+            <div class="empty">
+                Aucune action en attente d'approbation.
+            </div>
+        `;
+
+        return;
+    }
+
+    container.innerHTML = "";
+
+    list.forEach(approval => {
+
+        const id =
+            approval.action_id ??
+            approval.id ??
+            "";
+
+        container.innerHTML += `
+            <div class="approval">
+
+                <div class="approval-top">
+
+                    <div class="approval-action">
+                        ${esc(
+                            approval.action_type ||
+                            approval.action ||
+                            id
+                        )}
+                    </div>
+
+                    <span class="badge pending">
+                        PENDING
+                    </span>
+
+                </div>
+
+                <div class="approval-meta">
+                    Executor:
+                    ${esc(
+                        approval.executor ??
+                        approval.requested_by ??
+                        "agent"
+                    )}
+
+                    · Severity:
+                    ${esc(
+                        approval.severity ??
+                        "unknown"
+                    )}
+                </div>
+
+                <div class="approval-reason">
+                    ${esc(
+                        approval.reason ??
+                        approval.message ??
+                        "Action nécessitant une approbation."
+                    )}
+                </div>
+
+                <div class="approval-buttons">
+
+                    <button
+                        class="approve"
+                        onclick="decideApproval(
+                            '${escapeJs(id)}',
+                            'approve'
+                        )"
+                    >
+                        Approuver
+                    </button>
+
+                    <button
+                        class="reject"
+                        onclick="decideApproval(
+                            '${escapeJs(id)}',
+                            'reject'
+                        )"
+                    >
+                        Rejeter
+                    </button>
+
+                </div>
+
+            </div>
+        `;
+
+    });
+
+}
+
+
+/* ============================================================
+   APPROVAL ACTION
+============================================================ */
+
+async function decideApproval(id, decision) {
+
+    if (!id) {
+        toast("Action invalide.", true);
+        return;
+    }
+
+    try {
+
+        await apiPost(
+            `/api/approvals/${encodeURIComponent(id)}/${decision}`
+        );
+
+        toast(
+            decision === "approve"
+                ? "Action approuvée."
+                : "Action rejetée."
+        );
+
+        await refresh();
+
+    } catch (error) {
+
+        toast(error.message, true);
+
+    }
+
+}
+
+
+/* ============================================================
+   HISTORY
+============================================================ */
+
+function updateHistory(data) {
+
+    const list =
+        Array.isArray(data.history)
+            ? data.history
+            : [];
+
+    const body =
+        document.getElementById("historyBody");
+
+    if (!list.length) {
+
+        body.innerHTML = `
+            <tr>
+                <td colspan="4" class="empty">
+                    Aucune intervention journalisée.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    body.innerHTML = "";
+
+    list.forEach(item => {
+
+        const status =
+            normalizeStatus(item.status);
+
+        body.innerHTML += `
+            <tr>
+
+                <td>
+                    ${esc(formatDate(item.timestamp))}
+                </td>
+
+                <td>
+                    ${esc(item.action_id || "—")}
+                </td>
+
+                <td>
+                    <span class="badge ${status}">
+                        ${esc(status)}
+                    </span>
+                </td>
+
+                <td>
+                    ${esc(
+                        item.message ||
+                        item.reason ||
+                        "—"
+                    )}
+                </td>
+
+            </tr>
+        `;
+
+    });
+
+}
+
+
+/* ============================================================
+   REFRESH
+============================================================ */
+
+async function refresh() {
+
+    if (!apiKey) {
+        return;
+    }
+
+    document.body.classList.add("loading");
+
+    try {
+
+        const [
+            infrastructure,
+            decisions,
+            summary,
+            history,
+            approvals
+        ] = await Promise.all([
+
+            apiGet("/api/dashboard/infra"),
+
+            apiGet(
+                "/api/dashboard/decisions?limit=50"
+            ),
+
+            apiGet(
+                "/api/dashboard/summary"
+            ),
+
+            apiGet(
+                "/api/dashboard/history?limit=50"
+            ),
+
+            apiGet(
+                "/api/dashboard/approvals"
+            )
+
+        ]);
+
+        updateInfrastructure(infrastructure);
+
+        updateDecisions(decisions);
+
+        updateSummary(summary);
+
+        updateHistory(history);
+
+        updateApprovals(approvals);
+
+        document.getElementById(
+            "connectionText"
+        ).textContent = "SYSTEM ONLINE";
+
+        document.getElementById(
+            "lastUpdate"
+        ).textContent =
+            new Date().toLocaleTimeString("fr-FR");
+
+    } catch (error) {
+
+        document.getElementById(
+            "connectionText"
+        ).textContent = "OFFLINE";
+
+        setStatus("apiStatus", 0);
+
+        toast(error.message, true);
+
+    } finally {
+
+        document.body.classList.remove("loading");
+
+    }
+
+}
+
+
+/* ============================================================
+   CONNECT
+============================================================ */
+
+async function connectDashboard(show = true) {
+
+    const key =
+        document.getElementById(
+            "apiKeyInput"
+        ).value.trim();
+
+    if (!key) {
+
+        toast(
+            "Veuillez saisir la clé API.",
+            true
+        );
+
+        return;
+    }
+
+    apiKey = key;
+
+    localStorage.setItem(
+        "monitoring_api_key",
+        key
+    );
+
+    try {
+
+        await refresh();
+
+        clearInterval(refreshTimer);
+
+        refreshTimer = setInterval(
+            refresh,
+            REFRESH_INTERVAL * 1000
+        );
+
+        if (show) {
+            toast(
+                "Dashboard connecté."
+            );
+        }
+
+    } catch (error) {
+
+        toast(
+            error.message,
+            true
+        );
+
+    }
+
+}
+
+</script>
+
+</body>
+</html>

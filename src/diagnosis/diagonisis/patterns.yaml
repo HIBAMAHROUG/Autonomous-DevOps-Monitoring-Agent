@@ -1,0 +1,55 @@
+categories:
+  OutOfMemory:
+    patterns:
+      - "OutOfMemory"
+      - "OOMKilled"
+      - "out of memory"
+      - "MemoryError"
+    confidence: 0.95
+
+  HighMemory:
+    patterns:
+      - "memory pressure"
+      - "memory usage"
+      - "high memory"
+      - "memory threshold"
+    confidence: 0.85
+
+  HighCPU:
+    patterns:
+      - "CPU pressure"
+      - "high CPU"
+      - "CPU usage"
+      - "CPU threshold"
+    confidence: 0.85
+
+  DiskFull:
+    patterns:
+      - "no space left on device"
+      - "disk full"
+      - "disk.*full"
+      - "filesystem.*full"
+    confidence: 0.95
+
+  NetworkTimeout:
+    patterns:
+      - "NetworkTimeout"
+      - "connection timed out"
+      - "ConnectionTimeout"
+      - "timeout"
+      - "timed out"
+    confidence: 0.90
+
+  CrashLoop:
+    patterns:
+      - "CrashLoopBackOff"
+      - "container.*crash"
+      - "application.*crashed"
+    confidence: 0.90
+
+  ConnectionRefused:
+    patterns:
+      - "Connection refused"
+      - "connection refused"
+      - "ECONNREFUSED"
+    confidence: 0.90

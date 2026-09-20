@@ -1,0 +1,147 @@
+﻿services:
+  influxdb:
+    image: influxdb:2.7
+    container_name: influxdb
+    ports:
+      - "8086:8086"
+    environment:
+      DOCKER_INFLUXDB_INIT_MODE: setup
+      DOCKER_INFLUXDB_INIT_USERNAME: admin
+      DOCKER_INFLUXDB_INIT_PASSWORD: ${INFLUXDB_INIT_PASSWORD:?Set INFLUXDB_INIT_PASSWORD in .env}
+      DOCKER_INFLUXDB_INIT_ORG: monitoring
+      DOCKER_INFLUXDB_INIT_BUCKET: ai-agent
+      DOCKER_INFLUXDB_INIT_RETENTION: 720h0m0s
+      DOCKER_INFLUXDB_INIT_ADMIN_TOKEN: ${INFLUXDB_INIT_ADMIN_TOKEN:?Set INFLUXDB_INIT_ADMIN_TOKEN in .env}
+    volumes:
+      - influxdb-data:/var/lib/influxdb2
+    restart: unless-stopped
+
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ../config/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus  # ✅ Utilise le volume défini en bas
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+      - "--web.enable-lifecycle"
+      - "--storage.tsdb.retention.time=30d"
+      - "--storage.tsdb.retention.size=10GB"
+    restart: unless-stopped
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    ports:
+      - "9100:9100"
+    command:
+      - "--path.rootfs=/host"
+      - "--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc|rootfs/var/lib/docker/containers|rootfs/var/lib/docker/overlay2|rootfs/run/docker/netns|rootfs/var/lib/docker/aufs)($$|/)"
+      - "--collector.filesystem.ignored-fs-types=^(tmpfs|devpts|nsfs|overlay|aufs|proc|sysfs|binfmt_misc)$"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    restart: unless-stopped
+
+  loki:
+    image: grafana/loki:2.9.0
+    container_name: loki
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    restart: unless-stopped
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?Set GRAFANA_ADMIN_PASSWORD in .env}
+      GF_AUTH_ANONYMOUS_ENABLED: "true"
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Viewer
+      GF_SECURITY_ALLOW_EMBEDDING: "true"
+      GF_INSTALL_PLUGINS: grafana-piechart-panel
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile
+    container_name: monitoring-api
+    command: python -u src/api/app.py
+    ports:
+      - "5000:5000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      API_KEY: ${API_KEY:?Set API_KEY in .env}
+      PROMETHEUS_URL: http://prometheus:9090
+      PROMETHEUS_REQUIRE_AUTH: "false"
+      LOKI_URL: http://loki:3100
+      INFLUX_URL: http://influxdb:8086
+      INFLUX_ORG: monitoring
+      INFLUX_BUCKET: ai-agent
+      INFLUX_TOKEN: ${INFLUXDB_INIT_ADMIN_TOKEN:?Set INFLUXDB_INIT_ADMIN_TOKEN in .env}
+      AUDIT_BACKEND: sqlite
+      AUDIT_DB_PATH: /app/data/audit.sqlite3
+      KUBECONFIG: /app/kube-config/config
+      K8S_NAMESPACE: default
+      REMEDIATION_BACKEND: json
+      LOG_LEVEL: DEBUG
+      # ---- Notifications email pour les approbations humaines (US 4.2) ----
+      # SMTP_PASSWORD doit être un "mot de passe d'application" Gmail,
+      # PAS le mot de passe normal du compte (Google le refuse en SMTP direct).
+      # Génère-le sur https://myaccount.google.com/apppasswords
+      # (nécessite la validation en 2 étapes activée sur le compte).
+      SMTP_HOST: ${SMTP_HOST}
+      SMTP_PORT: ${SMTP_PORT}
+      SMTP_USE_TLS: ${SMTP_USE_TLS}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+      APPROVAL_EMAIL_FROM: ${APPROVAL_EMAIL_FROM}
+      APPROVAL_EMAIL_TO: ${APPROVAL_EMAIL_TO}
+      # Empêche scikit-learn/joblib d'utiliser le backend multi-process
+      # "loky" (qui a besoin de /dev/shm) pour entraîner l'IsolationForest.
+      # Sans ça, l'entraînement peut planter le process Python de façon
+      # silencieuse (pas d'exception, juste un crash natif) si /dev/shm
+      # est trop petit dans le conteneur — symptôme typique : "Empty reply
+      # from server" côté client, et rien du tout dans les logs.
+      JOBLIB_MULTIPROCESSING: "0"
+      OMP_NUM_THREADS: "1"
+    shm_size: "512mb"
+    volumes:
+      - ../data:/app/data
+      - ${KUBECONFIG_PATH:-../.secrets/kubeconfig}:/app/kube-config/config:ro
+      - ../src/api:/app/src/api
+      # Nécessaire pour que DockerExecutor puisse exécuter
+      # `docker restart <container>` sur les conteneurs de l'hôte
+      # depuis l'intérieur de monitoring-api.
+      - /var/run/docker.sock:/var/run/docker.sock
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    depends_on:
+      - influxdb
+      - prometheus
+      - loki
+    restart: unless-stopped
+
+# ✅ DÉFINITION DES VOLUMES (obligatoire)
+volumes:
+  influxdb-data:
+    driver: local
+  prometheus-data:
+    driver: local
+  grafana-data:
+    driver: local

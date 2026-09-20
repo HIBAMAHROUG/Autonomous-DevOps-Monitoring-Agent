@@ -1,0 +1,46 @@
+# Python
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+*.class
+
+# Tests and tooling
+.pytest_cache/
+.coverage
+htmlcov/
+
+# IDE and OS
+.vscode/
+.idea/
+.DS_Store
+
+# Logs and runtime data
+*.log
+data/*.sqlite3
+data/metrics.jsonl
+storage/metrics.jsonl
+
+# Local credentials and configuration
+kube-docker-config.yaml
+.secrets/
+.env
+.env.*
+!.env.example
+
+# Terraform
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+
+# Local/debug files
+current-values.yaml
+values-fix.yaml
+incident.json
+*.bak2
+
+# Terraform local cache
+.terraform/
+*.tfstate
+*.tfstate.backup

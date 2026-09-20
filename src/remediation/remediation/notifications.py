@@ -1,0 +1,314 @@
+﻿"""
+Notifications Slack/Email pour les actions critiques nécessitant une
+approbation humaine (US 4.2).
+"""
+from __future__ import annotations
+
+import logging
+import os
+import smtplib
+from email.message import EmailMessage
+from typing import Any
+
+import requests
+
+logger = logging.getLogger("remediation.notifications")
+
+API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "http://localhost:5000")
+
+
+def _approve_reject_urls(action_id: str) -> tuple[str, str]:
+    return (
+        f"{API_BASE_URL}/api/approvals/{action_id}/approve",
+        f"{API_BASE_URL}/api/approvals/{action_id}/reject",
+    )
+
+
+def _send_slack(
+    action_id: str,
+    executor: str,
+    severity: str,
+    reason: str,
+) -> bool:
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+
+    if not webhook_url:
+        return False
+
+    approve_url, reject_url = _approve_reject_urls(action_id)
+
+    payload = {
+        "text": (
+            f":rotating_light: *Approbation requise* — action `{action_id}` "
+            f"({executor}, sévérité {severity})\n"
+            f"Raison : {reason}\n"
+            f"✅ Approuver : `curl -X POST {approve_url}`\n"
+            f"❌ Rejeter : `curl -X POST {reject_url}`\n"
+            f"Ou via le dashboard : {API_BASE_URL}/dashboard"
+        )
+    }
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            timeout=5,
+        )
+        response.raise_for_status()
+        return True
+
+    except requests.RequestException:
+        logger.exception(
+            "Échec de l'envoi de la notification Slack pour %s",
+            action_id,
+        )
+        return False
+
+
+def _send_email(
+    action_id: str,
+    executor: str,
+    severity: str,
+    reason: str,
+) -> bool:
+    smtp_host = os.getenv("SMTP_HOST")
+    to_addr = os.getenv("APPROVAL_EMAIL_TO")
+
+    if not smtp_host or not to_addr:
+        return False
+
+    approve_url, reject_url = _approve_reject_urls(action_id)
+
+    from_addr = os.getenv(
+        "APPROVAL_EMAIL_FROM",
+        "devops-agent@localhost",
+    )
+
+    message = EmailMessage()
+
+    message["Subject"] = (
+        f"[Agent DevOps] Approbation requise: "
+        f"{action_id} ({severity})"
+    )
+
+    message["From"] = from_addr
+    message["To"] = to_addr
+
+    message.set_content(
+        "Une action critique nécessite une approbation humaine.\n\n"
+        f"Action      : {action_id}\n"
+        f"Exécuteur   : {executor}\n"
+        f"Sévérité    : {severity}\n"
+        f"Raison      : {reason}\n\n"
+        f"Approuver : {approve_url}\n"
+        f"Rejeter   : {reject_url}\n"
+        f"Dashboard : {API_BASE_URL}/dashboard\n"
+    )
+
+    try:
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+
+        with smtplib.SMTP(
+            smtp_host,
+            smtp_port,
+            timeout=10,
+        ) as smtp:
+
+            if os.getenv(
+                "SMTP_USE_TLS",
+                "true",
+            ).lower() == "true":
+                smtp.starttls()
+
+            smtp_user = os.getenv("SMTP_USER")
+            smtp_password = os.getenv("SMTP_PASSWORD")
+
+            if smtp_user and smtp_password:
+                smtp.login(
+                    smtp_user,
+                    smtp_password,
+                )
+
+            smtp.send_message(message)
+
+        return True
+
+    except Exception:
+        logger.exception(
+            "Échec de l'envoi de l'email d'approbation pour %s",
+            action_id,
+        )
+        return False
+
+
+def notify_agent_offline(
+    reason: str,
+    since: str,
+) -> bool:
+    """
+    Alerte "Agent Offline" (Bug 3) : envoyée quand la connexion à l'API
+    Kubernetes est perdue depuis plus de 5 minutes.
+
+    Utilise un canal secondaire dédié (AGENT_OFFLINE_WEBHOOK_URL), distinct
+    du webhook Slack utilisé pour les approbations, pour rester joignable
+    même si le canal principal dépend lui aussi de l'infrastructure en panne.
+    Retombe sur SLACK_WEBHOOK_URL si aucun canal secondaire n'est configuré.
+    """
+    webhook_url = os.getenv("AGENT_OFFLINE_WEBHOOK_URL") or os.getenv(
+        "SLACK_WEBHOOK_URL"
+    )
+
+    if not webhook_url:
+        logger.critical(
+            "AGENT OFFLINE depuis %s : %s "
+            "(aucun webhook configuré pour relayer l'alerte)",
+            since,
+            reason,
+        )
+        return False
+
+    payload = {
+        "text": (
+            ":red_circle: *Agent DevOps hors ligne* :red_circle:\n"
+            f"Raison : {reason}\n"
+            f"Depuis : {since}\n"
+            "L'agent ne peut plus exécuter ni vérifier ses actions de "
+            "remédiation sur le cluster tant que la connexion n'est pas "
+            "rétablie."
+        )
+    }
+
+    try:
+        response = requests.post(
+            webhook_url,
+            json=payload,
+            timeout=5,
+        )
+        response.raise_for_status()
+        return True
+
+    except requests.RequestException:
+        logger.exception(
+            "Échec de l'envoi de l'alerte Agent Offline (depuis %s)",
+            since,
+        )
+        return False
+
+
+def notify_escalation(
+    action_id: str,
+    component: str,
+    reason: str,
+) -> dict[str, Any]:
+    """
+    Escalade vers l'équipe de garde (US 3.2 / US 2.2), distincte de
+    notify_approval_required : ici il n'y a rien à approuver/rejeter,
+    l'agent a soit renoncé (confiance de diagnostic < 80%), soit constaté
+    que la remédiation automatique n'a pas résolu l'incident.
+
+    Envoie sur les mêmes canaux (Slack/email) que les autres alertes,
+    sans les liens approve/reject.
+    """
+    webhook_url = os.getenv("SLACK_WEBHOOK_URL")
+    results = {"slack": False, "email": False}
+
+    if webhook_url:
+        payload = {
+            "text": (
+                ":warning: *Incident escaladé* — `{}` ({})\n"
+                "Raison : {}\n"
+                "Dashboard : {}/dashboard"
+            ).format(action_id, component, reason, API_BASE_URL)
+        }
+        try:
+            response = requests.post(webhook_url, json=payload, timeout=5)
+            response.raise_for_status()
+            results["slack"] = True
+        except requests.RequestException:
+            logger.exception(
+                "Échec de l'envoi de l'escalade Slack pour %s", action_id
+            )
+
+    smtp_host = os.getenv("SMTP_HOST")
+    to_addr = os.getenv("APPROVAL_EMAIL_TO")
+
+    if smtp_host and to_addr:
+        from_addr = os.getenv("APPROVAL_EMAIL_FROM", "devops-agent@localhost")
+        message = EmailMessage()
+        message["Subject"] = f"[Agent DevOps] Incident escaladé: {action_id}"
+        message["From"] = from_addr
+        message["To"] = to_addr
+        message.set_content(
+            "Un incident a été escaladé vers une intervention humaine.\n\n"
+            f"Action/incident : {action_id}\n"
+            f"Composant       : {component}\n"
+            f"Raison          : {reason}\n\n"
+            f"Dashboard : {API_BASE_URL}/dashboard\n"
+        )
+        try:
+            smtp_port = int(os.getenv("SMTP_PORT", "587"))
+            with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+                if os.getenv("SMTP_USE_TLS", "true").lower() == "true":
+                    smtp.starttls()
+                smtp_user = os.getenv("SMTP_USER")
+                smtp_password = os.getenv("SMTP_PASSWORD")
+                if smtp_user and smtp_password:
+                    smtp.login(smtp_user, smtp_password)
+                smtp.send_message(message)
+            results["email"] = True
+        except Exception:
+            logger.exception(
+                "Échec de l'envoi de l'email d'escalade pour %s", action_id
+            )
+
+    if not any(results.values()):
+        logger.warning(
+            "Aucun canal de notification configuré — incident %s "
+            "escaladé mais personne n'a été notifié en dehors du dashboard.",
+            action_id,
+        )
+
+    return results
+
+
+def notify_approval_required(
+    action_id: str,
+    executor: str,
+    severity: str,
+    reason: str,
+) -> dict[str, Any]:
+    """
+    Envoie une notification sur tous les canaux configurés.
+
+    Retourne :
+        {
+            "slack": bool,
+            "email": bool
+        }
+    """
+
+    results = {
+        "slack": _send_slack(
+            action_id,
+            executor,
+            severity,
+            reason,
+        ),
+        "email": _send_email(
+            action_id,
+            executor,
+            severity,
+            reason,
+        ),
+    }
+
+    if not any(results.values()):
+        logger.warning(
+            "Aucun canal de notification configuré "
+            "(SLACK_WEBHOOK_URL / SMTP_HOST+APPROVAL_EMAIL_TO) "
+            "— approbation requise pour %s mais personne n'a "
+            "été notifié en dehors du dashboard.",
+            action_id,
+        )
+
+    return results
