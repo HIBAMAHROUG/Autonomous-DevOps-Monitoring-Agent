@@ -57,42 +57,7 @@ L'**Agent DevOps Autonome** est un système intelligent capable de :
 - Déploiement en environnement de production client (limité au staging/test).
 - Développement d'un système de monitoring from scratch (réutilisation des outils existants).
 
----
 
-##  Architecture
-
-La structure cible est disponible sous `src/`, `config/` et `infra/` :
-
-```text
-src/
-├── ingestion/collector/       # collector, métriques et traitement
-├── ingestion/loki/            # configuration Loki
-├── ingestion/alloy/           # configuration Alloy
-├── detection/detector/        # détection par règles
-├── detection/anomaly_agent/   # détection ML
-├── diagnosis/diagonisis/      # logs et cause racine
-├── orchestration/             # orchestrateur et boucle de surveillance
-├── remediation/remediation/   # décisions, sécurité et catalogue
-├── remediation/executor/     # exécuteurs d'actions
-├── storage/storage/            # accès aux données
-├── storage/events/             # événements persistés
-├── api/api/                    # routes API
-├── api/templates/              # interface dashboard
-└── common/                     # utilitaires partagés
-config/
-├── config/
-└── *.yaml
-infra/
-├── terraform/
-├── k8s/
-├── ansible/
-├── monitoring/
-├── grafana/
-├── docker-compose.yml
-├── docker-entrypoint.sh
-├── Dockerfile
-└── prometheus.yml
-```
 
 Chaque domaine possède désormais un seul emplacement canonique. Les anciens
 répertoires applicatifs et d'infrastructure ne sont pas dupliqués à la racine;
