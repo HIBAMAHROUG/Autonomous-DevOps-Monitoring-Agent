@@ -149,6 +149,10 @@ def handle_alert(
             "incident_id": incident_id,
             "outcome": "escalated",
             "reason": "loki_unavailable",
+            "diagnosis": {
+                "category": "LokiUnavailable",
+                "confidence": 0.0,
+            },
         }
 
     if diagnosis.confidence < 0.80:
@@ -242,6 +246,7 @@ def handle_alert(
             "outcome": "escalated",
             "reason": decision.reason,
             "decision": decision,
+            "diagnosis": diagnosis.to_dict(),
         }
 
     chosen_action_id = decision.chosen_action_id
@@ -254,6 +259,7 @@ def handle_alert(
             "outcome": outcome,
             "reason": "decision_without_action",
             "decision": decision,
+            "diagnosis": diagnosis.to_dict(),
         }
 
     action = _get_catalog().get(chosen_action_id)
@@ -263,6 +269,7 @@ def handle_alert(
             "incident_id": incident_id,
             "outcome": "failed",
             "reason": "unknown_action_id",
+            "diagnosis": diagnosis.to_dict(),
         }
 
     params = _build_params(pod, namespace, alert)
@@ -341,6 +348,7 @@ def handle_alert(
             "decision": decision,
             "execution_result": result,
             "verification": verification,
+            "diagnosis": diagnosis.to_dict(),
         }
 
     # Human approval path, or action without a known verification query.
@@ -378,4 +386,5 @@ def handle_alert(
         "outcome": outcome,
         "decision": decision,
         "execution_result": result,
+        "diagnosis": diagnosis.to_dict(),
     }

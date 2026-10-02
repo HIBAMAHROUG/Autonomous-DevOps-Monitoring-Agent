@@ -136,7 +136,7 @@ environment:
 ```powershell
 docker compose down
 docker compose build --no-cache
-docker compose up -d
+docker compose --env-file .env -f infra/docker-compose.yml up -d
 ```
 
 ### 4. Vérifier les logs

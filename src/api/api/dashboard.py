@@ -341,6 +341,60 @@ def history():
 # ============================================================
 
 _test_incidents = []
+_devops_interventions = []
+
+
+def _record_devops_intervention(
+    scenario: str,
+    metrics: dict,
+    service: str,
+    pod: str,
+    severity: str,
+    result: dict,
+) -> dict:
+    decision = result.get("decision")
+    execution = result.get("execution_result")
+    diagnosis = result.get("diagnosis") or {}
+    decision_mode = getattr(decision, "decision_mode", None)
+    if hasattr(decision_mode, "value"):
+        decision_mode = decision_mode.value
+    intervention = {
+        "incident_id": result.get("incident_id"),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "scenario": scenario,
+        "service": service,
+        "pod": pod,
+        "metric": "CPU",
+        "value": metrics.get("cpu_usage"),
+        "threshold": 90,
+        "severity": severity,
+        "decision_mode": decision_mode or result.get("outcome", "unknown"),
+        "outcome": result.get("outcome", "unknown"),
+        "root_cause": diagnosis.get("category") or "Unknown",
+        "root_cause_confidence": diagnosis.get("confidence", 0),
+        "action": getattr(decision, "chosen_action_id", None),
+        "reason": getattr(decision, "reason", result.get("reason", "")),
+        "approval_required": result.get("outcome") == "pending",
+        "execution_message": getattr(execution, "message", "") if execution else "",
+    }
+    _devops_interventions.insert(0, intervention)
+    del _devops_interventions[50:]
+    return intervention
+
+
+@dashboard_api.route("/devops-dashboard", methods=["GET"])
+def devops_dashboard_page():
+    return render_template("devops_dashboard.html")
+
+
+@dashboard_api.route("/api/dashboard/interventions", methods=["GET"])
+def interventions():
+    if not _check_api_key():
+        return jsonify({"error": "Unauthorized"}), 401
+    return jsonify({
+        "count": len(_devops_interventions),
+        "interventions": list(_devops_interventions),
+    })
 
 
 @dashboard_api.route("/api/dashboard/test-critical", methods=["POST"])
@@ -467,6 +521,14 @@ def simulate_real_incident():
     }
 
     result = handle_alert(alert, pod=pod_name, dry_run=dry_run)
+    intervention = _record_devops_intervention(
+        scenario,
+        metrics,
+        service_name,
+        pod_name,
+        severity,
+        result,
+    )
 
     return jsonify({
         "scenario": scenario,
@@ -474,6 +536,7 @@ def simulate_real_incident():
         "ml_score": round(score, 4),
         "severity": severity,
         "orchestrator_result": result,
+        "devops_intervention": intervention,
     })
 
 

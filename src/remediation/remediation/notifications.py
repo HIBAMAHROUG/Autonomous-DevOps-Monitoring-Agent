@@ -15,6 +15,10 @@ import requests
 logger = logging.getLogger("remediation.notifications")
 
 API_BASE_URL = os.getenv("AGENT_API_BASE_URL", "http://localhost:5000")
+DEVOPS_DASHBOARD_URL = os.getenv(
+    "AGENT_DEVOPS_DASHBOARD_URL",
+    f"{API_BASE_URL}/devops-dashboard",
+)
 
 
 def _approve_reject_urls(action_id: str) -> tuple[str, str]:
@@ -44,7 +48,8 @@ def _send_slack(
             f"Raison : {reason}\n"
             f"✅ Approuver : `curl -X POST {approve_url}`\n"
             f"❌ Rejeter : `curl -X POST {reject_url}`\n"
-            f"Ou via le dashboard : {API_BASE_URL}/dashboard"
+            f"Cellule DevOps : {DEVOPS_DASHBOARD_URL}\n"
+            f"Dashboard : {API_BASE_URL}/dashboard"
         )
     }
 
@@ -102,6 +107,7 @@ def _send_email(
         f"Raison      : {reason}\n\n"
         f"Approuver : {approve_url}\n"
         f"Rejeter   : {reject_url}\n"
+        f"Cellule DevOps : {DEVOPS_DASHBOARD_URL}\n"
         f"Dashboard : {API_BASE_URL}/dashboard\n"
     )
 
