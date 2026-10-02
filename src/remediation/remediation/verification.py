@@ -28,6 +28,13 @@ DEFAULT_WAIT_SECONDS = 60
 _SUPPORTED_COMPARISONS = ("below", "above")
 
 
+def _notify_escalation_safely(**kwargs) -> None:
+    try:
+        notify_escalation(**kwargs)
+    except Exception:
+        logger.exception("Failed to send remediation escalation notification")
+
+
 @dataclass
 class VerificationResult:
     action_id: str
@@ -103,7 +110,7 @@ def verify_remediation(
             action_id,
             component,
         )
-        notify_escalation(
+        _notify_escalation_safely(
             action_id=action_id,
             component=component,
             reason=f"Verification query failed: {exc}",
@@ -133,7 +140,7 @@ def verify_remediation(
             comparison,
             threshold,
         )
-        notify_escalation(
+        _notify_escalation_safely(
             action_id=action_id,
             component=component,
             reason=(

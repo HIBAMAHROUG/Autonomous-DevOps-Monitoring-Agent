@@ -26,6 +26,15 @@ def test_diagnose_matches_network_timeout():
     assert diagnosis.confidence == 0.90
 
 
+def test_diagnose_matches_config_error():
+    logs = [{"timestamp": "1", "message": "invalid configuration: port"}]
+
+    diagnosis = diagnose(logs)
+
+    assert diagnosis.category == "ConfigError"
+    assert diagnosis.confidence == 0.90
+
+
 def test_diagnose_most_recent_log_wins():
     # get_pod_logs interroge Loki avec direction="backward" : le log le
     # plus récent (premier de la liste) doit être celui qui déclenche le

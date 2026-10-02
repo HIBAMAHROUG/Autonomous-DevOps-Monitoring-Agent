@@ -54,6 +54,8 @@ def test_verify_remediation_still_above_threshold_escalates(monkeypatch):
     assert result.escalated is True
     assert len(escalated_calls) == 1
     assert escalated_calls[0]["action_id"] == "ACT-1"
+    assert "95.00" in escalated_calls[0]["reason"]
+    assert "80.00" in escalated_calls[0]["reason"]
 
 
 def test_verify_remediation_prometheus_error_escalates(monkeypatch):
@@ -105,3 +107,49 @@ def test_verify_remediation_waits_configured_seconds(monkeypatch):
     )
 
     assert slept == [60]
+
+
+def test_verify_remediation_wait_zero_skips_sleep(monkeypatch):
+    slept = []
+    monkeypatch.setattr(verification_module.time, "sleep", slept.append)
+    monkeypatch.setattr(
+        verification_module, "query_prometheus", lambda q: 1.0
+    )
+
+    result = verify_remediation(
+        action_id="ACT-4",
+        component="pod-d",
+        metric_query="q",
+        threshold=100.0,
+        wait_seconds=0,
+    )
+
+    assert result.resolved is True
+    assert slept == []
+
+
+def test_verify_remediation_query_error_survives_notification_failure(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        verification_module,
+        "query_prometheus",
+        lambda q: (_ for _ in ()).throw(RuntimeError("Prometheus down")),
+    )
+    monkeypatch.setattr(
+        verification_module,
+        "notify_escalation",
+        lambda **kwargs: (_ for _ in ()).throw(RuntimeError("Notifier down")),
+    )
+
+    result = verify_remediation(
+        action_id="ACT-5",
+        component="pod-e",
+        metric_query="q",
+        threshold=10.0,
+        wait_seconds=0,
+    )
+
+    assert result.resolved is False
+    assert result.escalated is True
+    assert result.error == "Prometheus down"

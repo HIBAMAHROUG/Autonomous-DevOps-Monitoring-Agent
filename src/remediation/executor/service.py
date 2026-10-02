@@ -22,23 +22,38 @@ from .scaling_executor import ScalingExecutor
 
 APPROVAL_REQUIRED_REASON = "Human approval required for critical action"
 
+OS_EXECUTOR_FACTORIES = {
+    "ansible": AnsibleExecutor,
+}
+
+K8S_WORKLOAD_EXECUTOR_FACTORIES = {
+    "k8s_pod_restart": K8sPodExecutor,
+    "kubectl_pod_restart": K8sPodExecutor,
+    "scaling": ScalingExecutor,
+    "kubectl_scale": ScalingExecutor,
+    "rollback": RollbackExecutor,
+}
+
+OTHER_EXECUTOR_FACTORIES = {
+    "docker": DockerExecutor,
+    "docker_restart": DockerExecutor,
+    "cleanup": CleanupExecutor,
+    "log_cleanup": CleanupExecutor,
+    "failover": FailoverExecutor,
+}
+
 
 class ExecutionService:
     def __init__(self):
         # Persist audit state so the collector and dashboard processes share it.
         self.safety = SafetyPolicy(persist=True)
+        executor_factories = {
+            **OTHER_EXECUTOR_FACTORIES,
+            **K8S_WORKLOAD_EXECUTOR_FACTORIES,
+            **OS_EXECUTOR_FACTORIES,
+        }
         self.executors = {
-            "docker": DockerExecutor(),
-            "docker_restart": DockerExecutor(),
-            "k8s_pod_restart": K8sPodExecutor(),
-            "kubectl_pod_restart": K8sPodExecutor(),
-            "scaling": ScalingExecutor(),
-            "kubectl_scale": ScalingExecutor(),
-            "cleanup": CleanupExecutor(),
-            "log_cleanup": CleanupExecutor(),
-            "failover": FailoverExecutor(),
-            "rollback": RollbackExecutor(),
-            "ansible": AnsibleExecutor(),
+            name: factory() for name, factory in executor_factories.items()
         }
 
     def execute(

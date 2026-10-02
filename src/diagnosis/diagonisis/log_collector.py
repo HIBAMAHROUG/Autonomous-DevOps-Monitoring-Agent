@@ -28,7 +28,7 @@ def _query(url: str, query: str) -> dict:
         "direction": "backward",
         "since": LOKI_LOOKBACK,
     }
-    response = requests.get(url, params=params, timeout=(2, MAX_DURATION))
+    response = requests.get(url, params=params, timeout=(1, MAX_DURATION))
     response.raise_for_status()
     return response.json()
 

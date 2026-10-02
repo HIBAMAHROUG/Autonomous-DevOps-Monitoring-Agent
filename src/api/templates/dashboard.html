@@ -300,6 +300,60 @@ body::before {
     border-radius: var(--radius);
 }
 
+.operator-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-bottom: 22px;
+    padding: 14px 18px;
+    border: 1px solid rgba(34, 211, 167, .18);
+    border-radius: var(--radius);
+    background: linear-gradient(110deg, rgba(34, 211, 167, .08), rgba(0, 212, 255, .03));
+}
+
+.operator-copy strong {
+    display: block;
+    font-size: 11px;
+    color: #fff;
+}
+
+.operator-copy span {
+    display: block;
+    margin-top: 3px;
+    color: var(--text-dim);
+    font-size: 9px;
+}
+
+.demo-controls {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.demo-button {
+    border: 1px solid rgba(34, 211, 167, .24);
+    border-radius: 7px;
+    padding: 8px 11px;
+    background: rgba(34, 211, 167, .08);
+    color: var(--green);
+    cursor: pointer;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 9px;
+    font-weight: 700;
+}
+
+.demo-button.critical {
+    border-color: rgba(245, 158, 11, .24);
+    background: rgba(245, 158, 11, .08);
+    color: var(--orange);
+}
+
+.demo-button:hover {
+    filter: brightness(1.25);
+}
+
 .key {
     flex: 1;
     min-width: 180px;
@@ -609,6 +663,47 @@ td {
     padding: 12px 14px;
 }
 
+.incident-feed {
+    display: grid;
+    gap: 8px;
+}
+
+.incident {
+    display: grid;
+    grid-template-columns: auto 1fr auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 13px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    background: rgba(255, 255, 255, .015);
+}
+
+.incident-marker {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--orange);
+    box-shadow: 0 0 12px rgba(245, 158, 11, .5);
+}
+
+.incident-main strong {
+    display: block;
+    font-size: 10px;
+    color: #fff;
+}
+
+.incident-main span,
+.incident-time {
+    color: var(--text-dim);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 8px;
+}
+
+.incident-time {
+    text-align: right;
+}
+
 .approval-top {
     display: flex;
     justify-content: space-between;
@@ -759,6 +854,15 @@ td {
     .main {
         padding: 12px;
     }
+
+    .incident {
+        grid-template-columns: auto 1fr;
+    }
+
+    .incident-time {
+        grid-column: 2;
+        text-align: left;
+    }
 }
 
 @media (max-width: 480px) {
@@ -856,7 +960,7 @@ td {
             Smartovate Ltd · Autonomous Operations
         </div>
 
-        <h1>DevOps Monitoring Center</h1>
+        <h1>Tableau de bord DevOps</h1>
 
         <div class="subtitle">
             Real-time infrastructure intelligence, incident detection &amp; autonomous remediation
@@ -904,6 +1008,18 @@ td {
         Last update: <b id="lastUpdate">—</b>
     </div>
 
+</section>
+
+<section class="operator-bar" aria-label="Incident simulation controls">
+    <div class="operator-copy">
+        <strong>Run the incident workflow</strong>
+        <span>Exercise detection, decision, remediation and human approval safely in dry-run mode.</span>
+    </div>
+
+    <div class="demo-controls">
+        <button class="demo-button" onclick="simulateIncident('auto')">Simulate auto-fix</button>
+        <button class="demo-button critical" onclick="simulateIncident('critical')">Simulate critical</button>
+    </div>
 </section>
 
 <div class="section-title" id="monitoring">
@@ -1115,6 +1231,17 @@ td {
         <div class="metric-foot">Unresolved actions</div>
     </div>
 
+</section>
+
+<div class="section-title">
+    <h2>Live Incident Feed</h2>
+    <span>Detection events</span>
+</div>
+
+<section class="card">
+    <div id="incidentFeed" class="incident-feed">
+        <div class="empty">No incidents in this session.</div>
+    </div>
 </section>
 
 <div class="section-title" id="approvals">
@@ -1858,6 +1985,47 @@ function updateHistory(data) {
 
 
 /* ============================================================
+   INCIDENT FEED / SAFE DEMO
+============================================================ */
+
+function updateIncidents(data) {
+
+    const list = Array.isArray(data.incidents)
+        ? data.incidents
+        : [];
+    const container = document.getElementById("incidentFeed");
+
+    if (!list.length) {
+        container.innerHTML = '<div class="empty">No incidents in this session.</div>';
+        return;
+    }
+
+    container.innerHTML = list.map(incident => `
+        <article class="incident">
+            <span class="incident-marker"></span>
+            <div class="incident-main">
+                <strong>${esc(incident.metric || "Incident")} · ${esc(incident.severity || "UNKNOWN")}</strong>
+                <span>${esc(incident.service || incident.pod || "Unknown service")} · ${esc(incident.decision || incident.status || "Detected")}</span>
+            </div>
+            <span class="incident-time">${esc(formatDate(incident.timestamp))}</span>
+        </article>
+    `).join("");
+}
+
+
+async function simulateIncident(scenario) {
+
+    try {
+        await apiPost("/api/dashboard/simulate-real-incident", {scenario, dry_run: true});
+        toast(scenario === "critical" ? "Critical incident queued for approval." : "Auto-remediation simulated.");
+        await refresh();
+    } catch (error) {
+        toast(error.message, true);
+    }
+}
+
+
+/* ============================================================
    REFRESH
 ============================================================ */
 
@@ -1876,7 +2044,8 @@ async function refresh() {
             decisions,
             summary,
             history,
-            approvals
+            approvals,
+            incidents
         ] = await Promise.all([
 
             apiGet("/api/dashboard/infra"),
@@ -1893,9 +2062,9 @@ async function refresh() {
                 "/api/dashboard/history?limit=50"
             ),
 
-            apiGet(
-                "/api/dashboard/approvals"
-            )
+            apiGet("/api/dashboard/approvals"),
+
+            apiGet("/api/dashboard/test-incidents")
 
         ]);
 
@@ -1908,6 +2077,8 @@ async function refresh() {
         updateHistory(history);
 
         updateApprovals(approvals);
+
+        updateIncidents(incidents);
 
         document.getElementById(
             "connectionText"

@@ -31,6 +31,16 @@ categories:
       - "filesystem.*full"
     confidence: 0.95
 
+  ConfigError:
+    patterns:
+      - "ConfigError"
+      - "configuration error"
+      - "invalid configuration"
+      - "failed to load configuration"
+      - "configmap.*not found"
+      - "secret.*not found"
+    confidence: 0.90
+
   NetworkTimeout:
     patterns:
       - "NetworkTimeout"

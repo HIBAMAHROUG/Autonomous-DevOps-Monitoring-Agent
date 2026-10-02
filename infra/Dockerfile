@@ -12,8 +12,8 @@ ENV PYTHONPATH=/app/src/ingestion:/app/src/detection:/app/src/diagnosis:/app/src
 # docker-compose.yml (/var/run/docker.sock) — pas de dockerd lancé ici.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends curl ca-certificates docker.io \
-    && KUBECTL_VERSION=$(curl -Ls https://dl.k8s.io/release/stable.txt) \
-    && curl -Lo /usr/local/bin/kubectl \
+    && KUBECTL_VERSION=$(curl -fLs --retry 5 --retry-delay 3 --retry-all-errors https://dl.k8s.io/release/stable.txt) \
+    && curl -fL --retry 5 --retry-delay 3 --retry-all-errors -o /usr/local/bin/kubectl \
        "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl" \
     && chmod +x /usr/local/bin/kubectl \
     && apt-get purge -y curl \

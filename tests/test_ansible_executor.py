@@ -1,6 +1,8 @@
-﻿from unittest.mock import MagicMock, patch
+﻿import subprocess
 
-from executor.ansible_executor import AnsibleExecutor
+from unittest.mock import MagicMock, patch
+
+from executor.ansible_executor import ALLOWED_PLAYBOOKS, AnsibleExecutor
 from executor.service import ExecutionService
 from remediation.models import Action
 
@@ -19,6 +21,14 @@ def test_rejects_unknown_playbook():
         "non autorisé" in result.message.lower()
         or "inconnu" in result.message.lower()
     )
+
+
+def test_allowed_playbooks_exist_as_system_playbooks():
+    assert set(ALLOWED_PLAYBOOKS) == {
+        "cleanup_disk_space",
+        "restart_service",
+    }
+    assert all(path.is_file() for path in ALLOWED_PLAYBOOKS.values())
 
 
 @patch("executor.ansible_executor.subprocess.run")
@@ -91,6 +101,23 @@ def test_ansible_playbook_not_installed_returns_clean_failure(mock_run):
 
 
 @patch("executor.ansible_executor.subprocess.run")
+def test_ansible_timeout_returns_clean_failure(mock_run):
+    mock_run.side_effect = subprocess.TimeoutExpired(
+        cmd="ansible-playbook", timeout=120
+    )
+
+    result = AnsibleExecutor().execute(
+        "a1",
+        {"playbook": "cleanup_disk_space"},
+        dry_run=True,
+    )
+
+    assert result.success is False
+    assert "timeout" in result.message.lower()
+    assert "120" in result.error
+
+
+@patch("executor.ansible_executor.subprocess.run")
 def test_execution_service_routes_ansible_action(mock_run):
     mock_run.return_value = MagicMock(
         returncode=0,
@@ -119,3 +146,12 @@ def test_execution_service_routes_ansible_action(mock_run):
 
     assert result.success is True
     assert result.executor == "ansible"
+
+
+def test_execution_service_keeps_kubernetes_workloads_separate():
+    service = ExecutionService()
+
+    assert service.executors["ansible"].__class__.__name__ == "AnsibleExecutor"
+    assert service.executors["k8s_pod_restart"].__class__.__name__ == "K8sPodExecutor"
+    assert service.executors["scaling"].__class__.__name__ == "ScalingExecutor"
+    assert service.executors["rollback"].__class__.__name__ == "RollbackExecutor"
