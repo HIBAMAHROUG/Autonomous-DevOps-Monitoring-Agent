@@ -124,7 +124,9 @@
     volumes:
       - ../data:/app/data
       - ${KUBECONFIG_PATH:-../.secrets/kubeconfig}:/app/kube-config/config:ro
-      - ../src/api:/app/src/api
+      # En développement, partager tout le code applicatif garde l'API,
+      # le monitor et les exécuteurs sur la même version du projet.
+      - ../src:/app/src
       # Nécessaire pour que DockerExecutor puisse exécuter
       # `docker restart <container>` sur les conteneurs de l'hôte
       # depuis l'intérieur de monitoring-api.

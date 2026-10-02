@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from detector.detector import check_metrics
+from anomaly_agent.severity import classify_severity
 
 logger = logging.getLogger(__name__)
 
@@ -75,6 +76,7 @@ def _metric_value(metrics: Dict[str, Any], metric: str) -> Optional[float]:
 def _ml_confirm(
     metrics: Dict[str, Any],
     alert: Dict[str, Any],
+    detector: Any = None,
 ) -> Dict[str, Any]:
     """
     Try to confirm an alert with Isolation Forest.
@@ -83,7 +85,7 @@ def _ml_confirm(
     ML implementation can vary between project versions.
     """
 
-    detector = _get_ml_detector()
+    detector = detector or _get_ml_detector()
 
     if detector is None:
         alert["ml_confirmed"] = True
@@ -104,6 +106,17 @@ def _ml_confirm(
         return alert
 
     try:
+        if hasattr(detector, "score_sample"):
+            score, z_scores = detector.score_sample(metrics)
+            alert["ml_score"] = float(score)
+            alert["z_scores"] = dict(z_scores)
+            severity = classify_severity(float(score), detector.thresholds)
+            alert["ml_confirmed"] = severity is not None
+            alert["ml_confidence"] = 1.0 if severity is not None else 0.0
+            if severity is not None:
+                alert["severity"] = severity
+            return alert
+
         # Support several common detector APIs.
         if hasattr(detector, "predict"):
             result = detector.predict([[value]])
@@ -173,6 +186,7 @@ def check_and_confirm(
     service: str = "infrastructure",
     pod: Optional[str] = None,
     baselines: Optional[Dict[str, Any]] = None,
+    ml_detector: Any = None,
 ) -> List[Dict[str, Any]]:
     """
     Main two-stage detection pipeline.
@@ -225,6 +239,7 @@ def check_and_confirm(
         alert = _ml_confirm(
             metrics,
             alert,
+            detector=ml_detector,
         )
 
         if alert.get("ml_confirmed", True):

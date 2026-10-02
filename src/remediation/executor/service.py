@@ -130,7 +130,12 @@ class ExecutionService:
             dry_run=dry_run,
         )
         self.safety.record_result(result.success)
-        self.safety.audit(action.action_id, result.success, result.message)
+        audit_message = (
+            result.message
+            or result.error
+            or ("Execution succeeded" if result.success else "Execution failed")
+        )
+        self.safety.audit(action.action_id, result.success, audit_message)
         return result
 
     def execute_and_verify(

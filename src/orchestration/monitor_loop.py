@@ -51,28 +51,29 @@ INCIDENT_COOLDOWN_SECONDS = int(
 PROM_QUERIES = {
     "cpu_usage": (
         '100 - (avg(rate('
-        'node_cpu_seconds_total{mode="idle"}[5m]'
+        'node_cpu_seconds_total{job="node-exporter",mode="idle"}[5m]'
         ')) * 100)'
     ),
     "memory_usage": (
-        '(1 - (node_memory_MemAvailable_bytes / '
-        'node_memory_MemTotal_bytes)) * 100'
+        '(1 - (node_memory_MemAvailable_bytes{job="node-exporter"} / '
+        'node_memory_MemTotal_bytes{job="node-exporter"})) * 100'
     ),
     "network_usage": (
         'sum(rate('
-        'node_network_receive_bytes_total{device!="lo"}[5m]'
+        'node_network_receive_bytes_total{job="node-exporter",device!="lo"}[5m]'
         ')) + sum(rate('
-        'node_network_transmit_bytes_total{device!="lo"}[5m]'
+        'node_network_transmit_bytes_total{job="node-exporter",device!="lo"}[5m]'
         '))'
     ),
     "disk_usage": (
-        '100 - ((node_filesystem_avail_bytes{mountpoint="/rootfs"} / '
-        'node_filesystem_size_bytes{mountpoint="/rootfs"}) * 100)'
+        '100 - ((node_filesystem_avail_bytes{job="node-exporter",mountpoint="/"} / '
+        'node_filesystem_size_bytes{job="node-exporter",mountpoint="/"}) * 100)'
     ),
 }
 
 _last_incident_at: float | None = None
 _stop_event = threading.Event()
+_OPTIONAL_METRICS = {"disk_usage"}
 
 
 def _prometheus_query_url() -> str:
@@ -146,6 +147,14 @@ def _collect_metrics() -> dict[str, float] | None:
     for name, expr in PROM_QUERIES.items():
         value = _query_prometheus(expr)
         if value is None:
+            if name in _OPTIONAL_METRICS:
+                logger.info(
+                    "monitor_loop: métrique optionnelle '%s' indisponible, "
+                    "valeur neutre utilisée",
+                    name,
+                )
+                metrics[name] = 0.0
+                continue
             logger.warning(
                 "monitor_loop: métrique '%s' indisponible, cycle ignoré",
                 name,

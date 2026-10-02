@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import os
-import subprocess
 from typing import Any
+
+from remediation.executors.kubectl_client import run_kubectl
 
 from .base import BaseExecutor, ExecutionResult
 
@@ -63,14 +64,8 @@ class K8sPodExecutor(BaseExecutor):
             )
 
         try:
-            completed = subprocess.run(
-                command,
-                capture_output=True,
-                text=True,
-                timeout=75,
-                check=False,
-            )
-        except (OSError, subprocess.TimeoutExpired) as exc:
+            completed = run_kubectl(command, timeout=75)
+        except OSError as exc:
             return ExecutionResult(
                 success=False,
                 action_id=action_id,
@@ -96,4 +91,9 @@ class K8sPodExecutor(BaseExecutor):
             executor="k8s_pod_restart",
             dry_run=False,
             message=completed.stdout.strip() or f"Pod {pod} restarted",
+            metadata={
+                "operation": "delete",
+                "pod": str(pod),
+                "namespace": str(namespace),
+            },
         )

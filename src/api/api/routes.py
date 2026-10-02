@@ -1,11 +1,18 @@
 ﻿import os
 from flask import Blueprint, request, jsonify, current_app
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 from storage.metrics_store import MetricsStore
 
 metrics_api = Blueprint('metrics_api', __name__)
 
 # Initialisation du store
 store = MetricsStore()
+
+
+@metrics_api.route('/metrics', methods=['GET'])
+def prometheus_metrics():
+    """Expose process metrics for Prometheus scraping."""
+    return generate_latest(), 200, {"Content-Type": CONTENT_TYPE_LATEST}
 
 @metrics_api.route('/api/health', methods=['GET'])
 def health():

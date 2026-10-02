@@ -20,9 +20,10 @@ RUN apt-get update \
     && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/*
 
-COPY . .
-
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
 
 # Corrige les fins de ligne CRLF qu'un checkout Windows/Git peut avoir
 # introduites dans docker-entrypoint.sh : avec un \r final, le noyau

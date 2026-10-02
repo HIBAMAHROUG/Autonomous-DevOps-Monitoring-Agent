@@ -251,7 +251,17 @@ def handle_alert(
     params = _build_params(pod, namespace, alert)
     metric_query = METRIC_QUERIES.get(str(alert.get("metric", "")).upper())
     threshold = alert.get("threshold")
-    can_verify = metric_query is not None and threshold is not None
+    # kubectl delete --wait=true already verifies that the pod deletion
+    # completed. A node-wide CPU query is not a valid post-delete signal:
+    # another workload can keep it above the incident threshold.
+    can_verify = (
+        metric_query is not None
+        and threshold is not None
+        and action.executor.lower() not in {
+            "k8s_pod_restart",
+            "kubectl_pod_restart",
+        }
+    )
 
     if decision.decision_mode == DecisionMode.AUTO_EXECUTE and can_verify:
         kwargs = dict(

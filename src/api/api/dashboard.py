@@ -35,6 +35,14 @@ PROMETHEUS_URL = os.getenv(
 )
 
 
+def _prometheus_query_url() -> str:
+    """Accept either a Prometheus base URL or its query endpoint."""
+    base_url = PROMETHEUS_URL.rstrip("/")
+    if base_url.endswith("/api/v1/query"):
+        return base_url
+    return f"{base_url}/api/v1/query"
+
+
 # ============================================================
 # PROMETHEUS - REQUÊTES CORRIGÉES AVEC FILTRES job
 # ============================================================
@@ -85,7 +93,7 @@ def _query_prometheus(expr: str) -> float | None:
         logger.debug(f"Querying Prometheus: {expr}")
         
         response = requests.get(
-            PROMETHEUS_URL,
+            _prometheus_query_url(),
             params={"query": expr},
             timeout=10,
         )
@@ -140,6 +148,8 @@ def _classify_entry(entry: dict) -> str:
     success = entry.get("success", False)
     if message == "Human approval required for critical action":
         return "escalated"
+    if " deleted from " in message and "kubectl execution failed" not in message:
+        return "resolved"
     return "resolved" if success else "failed"
 
 

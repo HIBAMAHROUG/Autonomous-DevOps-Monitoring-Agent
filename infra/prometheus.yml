@@ -24,22 +24,6 @@ scrape_configs:
     metrics_path: '/metrics'
     scrape_interval: 30s
 
-  # ✅ Monitoring API
-  - job_name: 'api'
-    static_configs:
-      - targets: 
-          - 'api:5000'
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-
-  # ✅ Collector
-  - job_name: 'collector'
-    static_configs:
-      - targets: 
-          - 'collector:5001'
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-
 # ❌ SUPPRIME CES LIGNES (elles causent l'erreur) :
 # storage:
 #   tsdb:
