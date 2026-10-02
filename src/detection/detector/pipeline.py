@@ -59,7 +59,14 @@ def _metric_value(metrics: Dict[str, Any], metric: str) -> Optional[float]:
     Extract a numeric metric value from different possible
     metric dictionary formats.
     """
-    value = metrics.get(metric)
+    metric_fields = {
+        "CPU": "cpu_usage",
+        "MEMORY": "memory_usage",
+        "NETWORK": "network_usage",
+        "DISK": "disk_usage",
+    }
+    field_name = metric_fields.get(str(metric).upper(), metric)
+    value = metrics.get(field_name)
 
     if value is None:
         value = metrics.get(metric.lower())
