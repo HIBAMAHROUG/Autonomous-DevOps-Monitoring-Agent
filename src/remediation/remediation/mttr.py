@@ -19,7 +19,7 @@ from datetime import datetime, timezone
 from statistics import mean
 from typing import Literal
 
-Outcome = Literal["resolved", "escalated", "pending"]
+Outcome = Literal["resolved", "escalated", "pending", "failed"]
 
 
 @dataclass

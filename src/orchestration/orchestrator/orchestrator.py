@@ -101,7 +101,12 @@ def handle_alert(
     dry_run: bool = False,
     verification_wait_seconds: int | None = None,
 ) -> dict[str, Any]:
-    pod = pod or alert.get("pod") or alert.get("service", "default")
+    pod = str(
+        pod
+        or alert.get("pod")
+        or alert.get("service")
+        or "default"
+    )
     incident_id = str(uuid4())
     detected_at = datetime.now(timezone.utc)
 
@@ -239,7 +244,19 @@ def handle_alert(
             "decision": decision,
         }
 
-    action = _get_catalog().get(decision.chosen_action_id)
+    chosen_action_id = decision.chosen_action_id
+    if not chosen_action_id:
+        outcome = "failed"
+        mttr.record_outcome(incident_id, outcome)
+        decision_log.update_outcome(log_entry.id, outcome)
+        return {
+            "incident_id": incident_id,
+            "outcome": outcome,
+            "reason": "decision_without_action",
+            "decision": decision,
+        }
+
+    action = _get_catalog().get(chosen_action_id)
     if action is None:
         mttr.record_outcome(incident_id, "failed")
         return {
@@ -251,12 +268,17 @@ def handle_alert(
     params = _build_params(pod, namespace, alert)
     metric_query = METRIC_QUERIES.get(str(alert.get("metric", "")).upper())
     threshold = alert.get("threshold")
+    threshold_value = (
+        float(threshold)
+        if threshold is not None
+        else None
+    )
     # kubectl delete --wait=true already verifies that the pod deletion
     # completed. A node-wide CPU query is not a valid post-delete signal:
     # another workload can keep it above the incident threshold.
     can_verify = (
         metric_query is not None
-        and threshold is not None
+        and threshold_value is not None
         and action.executor.lower() not in {
             "k8s_pod_restart",
             "kubectl_pod_restart",
@@ -264,20 +286,31 @@ def handle_alert(
     )
 
     if decision.decision_mode == DecisionMode.AUTO_EXECUTE and can_verify:
-        kwargs = dict(
-            action=action,
-            params=params,
-            metric_query=metric_query,
-            threshold=float(threshold),
-            component=pod,
-            comparison="below",
-            dry_run=dry_run,
-            severity=severity_value.upper(),
-        )
-        if verification_wait_seconds is not None:
-            kwargs["wait_seconds"] = verification_wait_seconds
-
-        result, verification = execution_service.execute_and_verify(**kwargs)
+        assert metric_query is not None
+        assert threshold_value is not None
+        if verification_wait_seconds is None:
+            result, verification = execution_service.execute_and_verify(
+                action=action,
+                params=params,
+                metric_query=metric_query,
+                threshold=threshold_value,
+                component=pod,
+                comparison="below",
+                dry_run=dry_run,
+                severity=severity_value.upper(),
+            )
+        else:
+            result, verification = execution_service.execute_and_verify(
+                action=action,
+                params=params,
+                metric_query=metric_query,
+                threshold=threshold_value,
+                component=pod,
+                comparison="below",
+                dry_run=dry_run,
+                severity=severity_value.upper(),
+                wait_seconds=verification_wait_seconds,
+            )
 
         if not result.success:
             outcome = "pending" if result.error == APPROVAL_REQUIRED_REASON else "failed"
@@ -292,7 +325,7 @@ def handle_alert(
             (datetime.now(timezone.utc) - detected_at).total_seconds(),
         )
         agent_metrics.record_remediation_action(
-            decision.chosen_action_id, result.success
+            chosen_action_id, result.success
         )
         decision_log.update_outcome(log_entry.id, outcome)
 
@@ -317,7 +350,7 @@ def handle_alert(
         dry_run=dry_run,
         severity=severity_value.upper(),
         metric_query=metric_query,
-        threshold=float(threshold) if threshold is not None else None,
+        threshold=threshold_value,
         comparison="below",
         component=pod,
     )
@@ -336,7 +369,7 @@ def handle_alert(
             (datetime.now(timezone.utc) - detected_at).total_seconds(),
         )
         agent_metrics.record_remediation_action(
-            decision.chosen_action_id, result.success
+            chosen_action_id, result.success
         )
         decision_log.update_outcome(log_entry.id, outcome)
 

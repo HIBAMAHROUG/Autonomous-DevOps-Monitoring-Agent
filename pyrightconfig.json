@@ -1,0 +1,20 @@
+{
+  "include": ["src", "tests"],
+  "exclude": ["Autonomous-DevOps-Monitoring-Agent", "**/__pycache__"],
+  "executionEnvironments": [
+    {
+      "root": ".",
+      "extraPaths": [
+        "src/ingestion",
+        "src/detection",
+        "src/diagnosis",
+        "src/orchestration",
+        "src/remediation",
+        "src/storage",
+        "src/api",
+        "src/common",
+        "infra"
+      ]
+    }
+  ]
+}

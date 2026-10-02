@@ -11,9 +11,9 @@ sans connaître le détail interne (mapping, scoring, decision).
 
 from __future__ import annotations
 
-from remediation.catalog import PostgresActionCatalog
+from remediation.catalog import ActionCatalog, PostgresActionCatalog
 from remediation.decision import DEFAULT_THRESHOLDS, decide
-from remediation.knowledge_base import PostgresKnowledgeBase
+from remediation.knowledge_base import KnowledgeBase, PostgresKnowledgeBase
 from remediation.mapping import map_anomaly_to_candidates
 from remediation.models import (
     Action,
@@ -49,8 +49,8 @@ __all__ = [
 
 def process_anomaly(
     anomaly: AnomalyEvent,
-    kb: PostgresKnowledgeBase,
-    catalog: PostgresActionCatalog,
+    kb: KnowledgeBase,
+    catalog: ActionCatalog,
     shadow_mode: bool = False,
 ) -> Decision:
     """
