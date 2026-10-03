@@ -31,7 +31,7 @@ export default function App() {
   const [draftKey, setDraftKey] = useState(getApiKey)
   const approvalsRef = useRef(null)
   const s = summary.data
-  const list = pending.data?.approvals ?? []
+  const list = (pending.data?.approvals ?? []).filter((approval) => !approval.action_id.startsWith('TEST-CRITICAL-'))
   const last = decisions.data?.recent?.[0]
   const lastEvent = history.data?.history?.[0]
   const cpu = infra.data?.cpu_percent
@@ -62,7 +62,7 @@ export default function App() {
       {activePage === 'Overview' && <>
       <section className="kpis">
         <Kpi label="Incidents detected" value={s?.detected ?? '--'} sub={`${s?.resolved ?? 0} resolved · ${s?.failed ?? 0} failed`} tone="ok" />
-        <Kpi label="Awaiting approval" value={s?.pending_approval ?? list.length} sub={`${s?.escalated ?? 0} escalated`} tone="wa" accent />
+        <Kpi label="Awaiting approval" value={list.length} sub={`${s?.escalated ?? 0} escalated`} tone="wa" accent />
         <Kpi label="Auto-remediated" value={s?.resolved ?? '--'} sub={`${Math.round((s?.auto_resolution_rate ?? 0) * 100)}% success rate`} tone="ok" />
         <Kpi label="Mean time to resolve" value={mmss(s?.mttr_seconds_avg)} unit="min" sub={`${s?.total_incidents ?? 0} incidents tracked`} tone="ok" />
       </section>

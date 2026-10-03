@@ -9,6 +9,7 @@ import os
 import smtplib
 from email.message import EmailMessage
 from typing import Any
+from urllib.parse import quote
 
 import requests
 
@@ -39,7 +40,7 @@ def _send_slack(
     if not webhook_url:
         return False
 
-    approve_url, reject_url = _approve_reject_urls(action_id)
+    dashboard_url = f"{DEVOPS_DASHBOARD_URL}?incident={quote(action_id)}"
 
     payload = {
         "text": (
@@ -100,15 +101,19 @@ def _send_email(
     message["To"] = to_addr
 
     message.set_content(
-        "Une action critique nécessite une approbation humaine.\n\n"
+        "ALERTE CRITIQUE — intervention humaine requise.\n\n"
+        "Le serveur présente une anomalie qui peut dégrader ou interrompre "
+        "le service. Avant toute approbation, l'ingénieur doit vérifier les "
+        "logs du pod, les changements de déploiement récents et l'impact "
+        "utilisateur.\n\n"
         f"Action      : {action_id}\n"
         f"Exécuteur   : {executor}\n"
         f"Sévérité    : {severity}\n"
         f"Raison      : {reason}\n\n"
-        f"Approuver : {approve_url}\n"
-        f"Rejeter   : {reject_url}\n"
-        f"Cellule DevOps : {DEVOPS_DASHBOARD_URL}\n"
-        f"Dashboard : {API_BASE_URL}/dashboard\n"
+        "ETAPE SUIVANTE\n"
+        "Ouvrez la console DevOps pour visualiser l'incident en rouge, "
+        "examiner les métriques et les logs, puis décider de la suite :\n"
+        f"{dashboard_url}\n"
     )
 
     try:

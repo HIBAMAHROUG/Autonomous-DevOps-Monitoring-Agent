@@ -29,6 +29,7 @@ export const api = {
   infra: () => request('/api/dashboard/infra'),
   decisions: (limit = 20) => request(`/api/dashboard/decisions?limit=${limit}`),
   history: (limit = 8) => request(`/api/dashboard/history?limit=${limit}`),
+  testIncidents: () => request('/api/dashboard/test-incidents'),
   safety: () => request('/api/safety/check'),
   pending: () => request('/api/approvals/pending'),
   decide: (id, decision) => request(`/api/approvals/${encodeURIComponent(id)}/${decision}`, { method: 'POST' }),

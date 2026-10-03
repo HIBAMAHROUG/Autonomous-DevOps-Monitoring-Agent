@@ -112,6 +112,7 @@
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       APPROVAL_EMAIL_FROM: ${APPROVAL_EMAIL_FROM:-}
       APPROVAL_EMAIL_TO: ${APPROVAL_EMAIL_TO:-}
+      AGENT_DEVOPS_DASHBOARD_URL: ${AGENT_DEVOPS_DASHBOARD_URL:-http://localhost:5173}
       # Empêche scikit-learn/joblib d'utiliser le backend multi-process
       # "loky" (qui a besoin de /dev/shm) pour entraîner l'IsolationForest.
       # Sans ça, l'entraînement peut planter le process Python de façon

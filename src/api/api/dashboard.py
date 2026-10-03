@@ -19,6 +19,7 @@ from executor.service import execution_service
 from orchestrator.orchestrator import handle_alert
 from remediation.approvals import approval_store
 from remediation.decision_log import decision_log
+from remediation.notifications import notify_approval_required
 
 # Configuration du logger
 logger = logging.getLogger(__name__)
@@ -420,6 +421,45 @@ def test_critical():
     }
 
     _test_incidents.append(incident)
+    approval_reason = (
+        "CRITICAL CPU incident on demo-pod. "
+        "Observed CPU 96.5%, above the 90% threshold. "
+        "The server is under sustained CPU saturation; this can cause "
+        "slow responses, request timeouts, and service instability. "
+        "Probable cause: an overloaded Kubernetes pod. "
+        "Proposed remediation: restart demo-pod after the engineer checks "
+        "the pod logs and confirms that no deployment is in progress."
+    )
+    approval_options = [
+        {
+            "executor": "k8s_pod_restart",
+            "label": "Restart demo-pod (Kubernetes)",
+            "params": {"pod_name": "demo-pod", "namespace": "default"},
+        },
+        {
+            "executor": "scaling",
+            "label": "Scale demo deployment out by one replica",
+            "params": {"deployment": "demo-service", "increment": 1},
+        },
+    ]
+    approval_reason += " Available options: restart the pod or scale the deployment by one replica."
+    approval_store.create(
+        action_id=incident["incident_id"],
+        executor="k8s_pod_restart",
+        params={
+            "pod_name": incident["pod"],
+            "namespace": "default",
+            "_available_actions": approval_options,
+        },
+        severity=incident["severity"],
+        reason=approval_reason,
+    )
+    notify_approval_required(
+        incident["incident_id"],
+        "k8s_pod_restart",
+        incident["severity"],
+        approval_reason,
+    )
 
     return jsonify({
         "success": True,

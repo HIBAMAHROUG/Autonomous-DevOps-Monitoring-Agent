@@ -7,6 +7,11 @@
 .metric{min-width:0;padding:12px;border:1px solid var(--ln);border-radius:9px;background:rgba(27,24,36,.45)}
 .metric strong{display:block;margin-top:7px;font:400 22px/1 var(--serif);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .metric .am{color:var(--am-t)}
+.critical-alert{padding:20px;border:1px solid #d05a6e;border-left:5px solid #d05a6e;border-radius:12px;background:rgba(208,90,110,.1);box-shadow:0 0 28px rgba(208,90,110,.08)}
+.critical-title{display:flex;align-items:center;gap:9px;color:var(--cr);font:600 11px var(--mono);letter-spacing:.08em}
+.critical-pulse{width:9px;height:9px;border-radius:50%;background:var(--cr);box-shadow:0 0 0 6px rgba(208,90,110,.15)}
+.critical-alert h2{margin:10px 0 5px;font:400 30px/1 var(--serif)}
+.critical-alert p{color:var(--tx);font-size:14px}.critical-facts{display:flex;gap:20px;margin-top:16px;color:var(--mu);font:12px var(--mono)}.critical-facts strong{color:var(--cr);font-weight:600}.critical-help{margin-top:16px;color:var(--mu);font-size:12px}
 .nav{width:100%;border:0;text-align:left;font:inherit;background:transparent;color:var(--mu);cursor:pointer;padding:9px 12px}
 .page-heading{display:flex;align-items:end;justify-content:space-between;border-bottom:1px solid var(--ln);padding-bottom:18px}
 .page-heading h2{font:400 38px/1 var(--serif)}

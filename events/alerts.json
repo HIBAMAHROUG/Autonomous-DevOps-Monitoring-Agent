@@ -1,6 +1,6 @@
 [
     {
-        "timestamp": "2026-10-02T10:41:43.339562+00:00",
+        "timestamp": "2026-10-02T19:23:10.228118+00:00",
         "service": "svc-c",
         "pod": null,
         "metric": "CPU",
@@ -9,7 +9,7 @@
         "threshold": 70.0,
         "baseline": null,
         "trend_multiplier": null,
-        "sustained_seconds": 23712403.3,
+        "sustained_seconds": 23743690.2,
         "required_duration": 60.0,
         "severity": "medium",
         "maintenance_window": null
